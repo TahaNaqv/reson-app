@@ -1,0 +1,30 @@
+/* CircularProgressBar.module.css */
+
+.progressBar {
+    position: relative;
+  }
+  
+  .progressBar circle {
+    fill: none;
+  }
+  
+  .progressBarBackground {
+    stroke: #e6e6e6; /* Background color */
+    stroke-width: 8;
+    fill: none;
+  }
+  
+  .progressBarCircle {
+    stroke: #5FEBEB; /* Progress bar color */
+    stroke-width: 8;
+    fill: none;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset 0.5s;
+  }
+  
+  .text {
+    font-size: 18px;
+  }
+  

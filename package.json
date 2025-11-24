@@ -1,0 +1,40 @@
+{
+  "name": "reson",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-browser": "^5.2.0",
+    "@aws-sdk/client-s3": "^3.515.0",
+    "@aws-sdk/client-signer": "^3.521.0",
+    "@aws-sdk/client-transcribe": "^3.515.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.518.0",
+    "@aws-sdk/credential-providers": "^3.515.0",
+    "@aws-sdk/hash-node": "^3.374.0",
+    "@aws-sdk/s3-request-presigner": "^3.521.0",
+    "@upsetjs/react": "^1.11.0",
+    "aws-sdk": "^2.1551.0",
+    "axios": "^1.6.7",
+    "bootstrap": "^5.3.2",
+    "next": "14.1.0",
+    "next-auth": "^4.24.5",
+    "openai": "^4.28.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-toastify": "^10.0.3",
+    "reaviz": "^15.9.0",
+    "swiper": "^11.0.6",
+    "zeptomail": "^6.0.0"
+  },
+  "devDependencies": {
+    "@next/swc-wasm-nodejs": "^15.5.4",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.0",
+    "video.js": "^8.23.4"
+  }
+}
