@@ -8,7 +8,7 @@ const nextConfig = {
     return [
       {
         source: '/reson-api/:path*',
-        destination: 'https://resonapi.uarl.in/:path*',
+        destination: 'https://resonapi.getreson.com/:path*',
       },
     ];
   },
