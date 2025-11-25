@@ -4,10 +4,10 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { use } from "react";
 
 export const authOptions = {
-    secret: process.env.NEXTAUTH_SECRET,
-    session: {
-        strategy: 'jwt'
-    },
+  secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: 'jwt'
+  },
   // Configure one or more authentication providers
   providers: [
     CredentialsProvider({
@@ -15,57 +15,76 @@ export const authOptions = {
       name: "Credentials",
       type: 'credentials',
       async authorize(credentials, req) {
+        try {
+          // Log environment variables for debugging (remove in production)
+          console.log('LOGIN_API:', process.env.LOGIN_API);
+          console.log('GET_COMPANY_DATA:', process.env.GET_COMPANY_DATA);
 
-        var myHeaders = new Headers();
-        myHeaders.append("Content-Type", "application/json");
+          var myHeaders = new Headers();
+          myHeaders.append("Content-Type", "application/json");
 
-        var raw = JSON.stringify({
+          var raw = JSON.stringify({
             "email": credentials.email,
             "password": credentials.password
-        });
-console.log(raw)
-        var requestOptions = {
+          });
+          console.log('Login attempt for:', credentials.email);
+
+          var requestOptions = {
             method: 'POST',
             headers: myHeaders,
             body: raw
-        };
+          };
 
-        const res = await fetch(process.env.LOGIN_API, requestOptions)
+          const res = await fetch(process.env.LOGIN_API, requestOptions);
 
-        const user = await res.json();
-console.log(user.status)
-        if(user.status === 'true') {
-          let compId;
-          const getCompanyID = await axios.get(process.env.GET_COMPANY_DATA + user.user.user_id)
-// console.log(getCompanyID)
-          if(getCompanyID.status == 200) {
-            const companyData = await getCompanyID.data
-            console.log('cd', companyData)
-            if(companyData) {
-              compId = companyData.company_id
-            } else {
-              compId = 0
+          // Check if the response is OK
+          if (!res.ok) {
+            console.error('Login API error:', res.status, res.statusText);
+            const errorText = await res.text();
+            console.error('Error response:', errorText);
+            return null;
+          }
+
+          const user = await res.json();
+          console.log('Login response status:', user.status);
+
+          if (user.status === 'true') {
+            let compId = 0;
+
+            // Only fetch company data if GET_COMPANY_DATA is set
+            if (process.env.GET_COMPANY_DATA) {
+              try {
+                const getCompanyID = await axios.get(process.env.GET_COMPANY_DATA + user.user.user_id);
+                if (getCompanyID.status == 200) {
+                  const companyData = await getCompanyID.data;
+                  console.log('Company data:', companyData);
+                  if (companyData) {
+                    compId = companyData.company_id || 0;
+                  }
+                }
+              } catch (error) {
+                console.error('Error fetching company data:', error.message);
+                // Continue with compId = 0 if company fetch fails
+              }
             }
+
+            const usr = {
+              "user_id": user.user.user_id,
+              "company_id": compId,
+              "user_name": user.user.user_name,
+              "user_email": user.user.user_email_address
+            }
+
+            return usr;
+          } else {
+            console.log('Login failed - status is not true');
+            return null;
           }
-
-          console.log(getCompanyID.status)
-          console.log(compId)
-
-          const usr = {
-            "user_id": user.user.user_id,
-            "company_id": compId,
-            "user_name": user.user.user_name,
-            "user_email": user.user.user_email_address
-          }
-
-          // console.log(usr)
-
-            return usr
+        } catch (error) {
+          console.error('Authentication error:', error);
+          console.error('Error details:', error.message);
+          return null;
         }
-        else {
-          return null
-        }
-  
       }
     })
   ],
@@ -79,7 +98,7 @@ console.log(user.status)
       }
 
       // update the trigger to include patient_id
-      if(trigger === 'update') {
+      if (trigger === 'update') {
         token.user = session.user
       }
       //   return final_token
