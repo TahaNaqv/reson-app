@@ -64,7 +64,7 @@ export default function CreateProfile() {
                                 return false
                             }
                 
-                            userProfilePic = `https://reson-images.s3.eu-central-1.amazonaws.com/${userFolder}/${key}`
+                            userProfilePic = `https://reson-assets.s3.eu-central-1.amazonaws.com/${userFolder}/${key}`
                             s3key = key
                         }
 

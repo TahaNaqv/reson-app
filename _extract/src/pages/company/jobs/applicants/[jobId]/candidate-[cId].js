@@ -42,7 +42,7 @@ export default function CandidateResult() {
             for (const row of jobResultData) {
                 const s3Key = row.answer_key;
                 const s3Folder = row.job_s3_folder;
-                const s3VideoUrl = `https://reson-images.s3.eu-central-1.amazonaws.com/${s3Folder}/${s3Key}`
+                const s3VideoUrl = `https://reson-assets.s3.eu-central-1.amazonaws.com/${s3Folder}/${s3Key}`
                 try {
                     const transcriptionStatus = await axios.get(`/api/transcribe/status?jobName=${s3Key}`)
                     const transcriptionExists = await transcriptionStatus.data;

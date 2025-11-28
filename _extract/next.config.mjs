@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['reson-images.s3.eu-central-1.amazonaws.com']
+    domains: ['reson-assets.s3.eu-central-1.amazonaws.com']
   },
   async rewrites() {
     return [

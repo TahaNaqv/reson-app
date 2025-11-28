@@ -186,8 +186,8 @@ export default function RecordWelcomeMessageCEO() {
                 return false
             }
 
-            s3VideoUrl = `https://reson-images.s3.eu-central-1.amazonaws.com/${userFolder}/${key}`
-            s3VideoURI = `s3://reson-images/${userFolder}/${key}`
+            s3VideoUrl = `https://reson-assets.s3.eu-central-1.amazonaws.com/${userFolder}/${key}`
+            s3VideoURI = `s3://reson-assets/${userFolder}/${key}`
             s3VideoKey = key
         }
 
