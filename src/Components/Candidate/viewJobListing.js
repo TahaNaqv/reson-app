@@ -50,7 +50,7 @@ export default function ViewJobListing(jobDetails) {
                             <div className='row'>
                                 <div className='col-sm-3 text-end'>
                                     {s3FileUrl && (
-                                    <Image src={s3FileUrl} width={120} height={100} alt="Company Logo" className='companyLogo' priority={false} unoptimized={true} />
+                                    <img src={s3FileUrl} width={120} height={100} alt="Company Logo" className='companyLogo' />
                                     )}
                                 </div>
                                 <div className='col-sm-9'>

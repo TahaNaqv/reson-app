@@ -121,7 +121,7 @@ export default function JobApplicants() {
                     <div className='col-12 col-sm-3 company-details-bar text-center'>
                         <div className='pt-sm-5 pe-sm-3 ps-sm-3 pb-sm-2'>
                             {s3FileUrl && (
-                                <Image src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' priority={false} unoptimized={true} />
+                                <img src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' />
                             )}
                         </div>
                         <div className='pe-2 ps-2 pt-4 pb-1'>

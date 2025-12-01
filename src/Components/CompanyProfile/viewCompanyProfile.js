@@ -72,7 +72,7 @@ export default function ViewCompanyProfile() {
                         </div>
                         <div className='col-12 col-sm-3'>
                             {s3FileUrl && (
-                                <Image src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' priority={false} unoptimized={true} />
+                                <img src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' />
                             )}
                         </div>
                         <div className='col-12 col-sm-2'></div>
