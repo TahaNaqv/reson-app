@@ -54,7 +54,11 @@ export const authOptions = {
             // Only fetch company data if GET_COMPANY_DATA is set
             if (process.env.GET_COMPANY_DATA) {
               try {
-                const apiUrl = process.env.GET_COMPANY_DATA + user.user.user_id;
+                // Ensure there's a / between the base URL and user_id
+                const baseUrl = process.env.GET_COMPANY_DATA.endsWith('/')
+                  ? process.env.GET_COMPANY_DATA
+                  : process.env.GET_COMPANY_DATA + '/';
+                const apiUrl = baseUrl + user.user.user_id;
                 console.log('Fetching company data from:', apiUrl);
                 const getCompanyID = await axios.get(apiUrl);
                 console.log('Company API response status:', getCompanyID.status);
