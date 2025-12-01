@@ -75,11 +75,7 @@ export default function Welcome() {
 
             const { durl, dkey } = await res2.json()
 
-            const fetchS3Url = await fetch(durl, {
-                method: 'GET'
-            })
-
-            setS3VideoUrl(fetchS3Url.url);
+            setS3VideoUrl(durl);
             // console.log(s3VideoUrl)
 
         } catch (error) {

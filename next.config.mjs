@@ -2,7 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['reson-assets.s3.eu-central-1.amazonaws.com']
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'reson-assets.s3.eu-central-1.amazonaws.com',
+        pathname: '/**',
+      },
+    ],
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async rewrites() {
     return [

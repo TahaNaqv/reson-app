@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 // import Head from 'next/head'
 import Script from 'next/script'
 import { useRouter } from 'next/router';
@@ -21,26 +21,58 @@ export default function CreateProfile() {
     });
 
     const [render, setRender] = useState('');
+    const [scriptLoaded, setScriptLoaded] = useState(false);
+    const formInitialized = useRef(false);
 
     function cfform() {
-        if (typeof window !== "undefined") {
-            // Client-side-only code
-            if(window.cf) {
-                var conversationalForm = window.cf.ConversationalForm.startTheConversation({
-                    formEl: document.getElementById("profile-cf"),
-                    context: document.getElementById("cf-context"),
-                    submitCallback: async function() {
+        if (typeof window === "undefined") return;
+        
+        // Check if already initialized
+        if (formInitialized.current) return;
+        
+        // Check if script is loaded
+        if (!scriptLoaded || !window.cf || !window.cf.ConversationalForm) {
+            console.log('ConversationalForm not ready yet');
+            return;
+        }
+        
+        // Check if form elements exist
+        const formEl = document.getElementById("profile-cf");
+        const contextEl = document.getElementById("cf-context");
+        
+        if (!formEl) {
+            console.error('Form element not found');
+            return;
+        }
+        
+        if (!contextEl) {
+            console.error('Context element not found');
+            return;
+        }
+        
+        // Check if form has fields
+        const formFields = formEl.querySelectorAll('input, textarea');
+        if (formFields.length === 0) {
+            console.error('Form has no fields');
+            return;
+        }
+        
+        try {
+            var conversationalForm = window.cf.ConversationalForm.startTheConversation({
+                formEl: formEl,
+                context: contextEl,
+                submitCallback: async function() {
                       conversationalForm.addRobotChatResponse("Alright, you are done. We are creating your profile. You will be redirected shortly.");
                     //   console.log(conversationalForm.getFormData());
                         var formDataSerialized = conversationalForm.getFormData(true);
                         var formData = conversationalForm.getFormData();
                         const file = formData.get('company_logo');
-                        const filename = file.name
+                        const filename = file ? file.name : '';
                         let userProfilePic = ''
                         let s3key = ''
                         // console.log(formDataSerialized['user_id'])
                         // console.log('fdata: ', formData.get('user_id'));
-                        if(filename) {
+                        if(filename && file) {
                             // Upload the files to S3 bucket
                             const fileType = encodeURIComponent(file.type)
                             const userFolder = 'user_id_' + formData.get('user_id') + '/company'
@@ -114,15 +146,22 @@ export default function CreateProfile() {
                     }
                     }
                   });
-            }
-          }
-        
+            
+            formInitialized.current = true;
+        } catch (error) {
+            console.error('Error initializing conversational form:', error);
+            toast.error('Error loading form. Please refresh the page.');
+        }
   };
 
   const showForm = async () => {
     if(session) {
         if(session.user.company_id === 0) {
-            setTimeout(cfform, 2000);
+            // Wait for script to load and DOM to be ready
+            if (scriptLoaded) {
+                // Small delay to ensure DOM is ready
+                setTimeout(cfform, 100);
+            }
         } else {
             router.push('/company/dashboard');
         }
@@ -134,7 +173,7 @@ export default function CreateProfile() {
         if(render == 'initial') {
             showForm()
         }
-    }, [status, render]) 
+    }, [status, render, scriptLoaded]) 
 
     if (status === "loading") {
       return <PageLoader/>
@@ -154,7 +193,18 @@ export default function CreateProfile() {
 
     return(
         <>
-        <Script src='https://cdn.jsdelivr.net/gh/space10-community/conversational-form@1.0.1/dist/conversational-form.min.js' crossOrigin='yes' />
+        <Script 
+            src='https://cdn.jsdelivr.net/gh/space10-community/conversational-form@1.0.1/dist/conversational-form.min.js' 
+            crossOrigin='yes'
+            onLoad={() => {
+                console.log('ConversationalForm script loaded');
+                setScriptLoaded(true);
+            }}
+            onError={() => {
+                console.error('Failed to load ConversationalForm script');
+                toast.error('Failed to load form. Please refresh the page.');
+            }}
+        />
         {/* <Head>
         <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/space10-community/conversational-form@1.0.1/dist/conversational-form.min.js" crossorigin></script>
         </Head> */}

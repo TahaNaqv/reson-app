@@ -36,11 +36,7 @@ export default function ViewCompanyProfile() {
 
             const { durl, dkey } = await res2.json()
 
-            const fetchS3Url = await fetch(durl, {
-                method: 'GET'
-            })
-
-            setS3FileUrl(fetchS3Url.url);
+            setS3FileUrl(durl);
             // console.log(s3FileUrl);
             
         } catch (error) {
@@ -76,7 +72,7 @@ export default function ViewCompanyProfile() {
                         </div>
                         <div className='col-12 col-sm-3'>
                             {s3FileUrl && (
-                                <Image src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' priority={false} />
+                                <Image src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' priority={false} unoptimized={true} />
                             )}
                         </div>
                         <div className='col-12 col-sm-2'></div>

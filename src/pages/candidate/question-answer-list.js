@@ -112,11 +112,7 @@ export default function Welcome() {
 
                 const { durl, dkey } = await res2.json()
 
-                const fetchS3Url = await fetch(durl, {
-                    method: 'GET'
-                })
-
-                setRecruiterS3VideoUrl(fetchS3Url.url);
+                setRecruiterS3VideoUrl(durl);
 
                 // console.log('s3JsonKey', s3JsonKey)
 

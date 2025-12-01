@@ -49,11 +49,7 @@ export default function ViewJobAsRecruiter() {
 
             const { durl, dkey } = await res2.json()
 
-            const fetchS3Url = await fetch(durl, {
-                method: 'GET'
-            })
-
-            setS3FileUrl(fetchS3Url.url);
+            setS3FileUrl(durl);
             // console.log(s3FileUrl);
             
         } catch (error) {
@@ -97,7 +93,7 @@ export default function ViewJobAsRecruiter() {
                                 <div className='row'>
                                     <div className='col-sm-3 text-end'>
                                         {s3FileUrl && (
-                                        <Image src={s3FileUrl} width={120} height={100} alt="Company Logo" className='companyLogo' priority={false} />
+                                        <Image src={s3FileUrl} width={120} height={100} alt="Company Logo" className='companyLogo' priority={false} unoptimized={true} />
                                         )}
                                     </div>
                                     <div className='col-sm-9'>

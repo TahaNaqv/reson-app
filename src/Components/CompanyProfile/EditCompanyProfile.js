@@ -36,11 +36,7 @@ export default function EditCompanyProfile() {
 
             const { durl, dkey } = await res2.json()
 
-            const fetchS3Url = await fetch(durl, {
-                method: 'GET'
-            })
-
-            setS3FileUrl(fetchS3Url.url);
+            setS3FileUrl(durl);
             // console.log(s3FileUrl);
             
         } catch (error) {
@@ -166,7 +162,7 @@ export default function EditCompanyProfile() {
                             </label>
                             <input type='file' id='company_logo' className='hidden' name='company_logo' accept=".jpg, .jpeg, .png" onChange={handlePreview} />
                             {s3FileUrl && (
-                                <Image src={s3FileUrl} width={50} height={50} alt="Company Logo" className={`editCompanyLogo ${isActive ? "hidden" : ""}`} priority={false} id='s3CompanyLogo' />
+                                <Image src={s3FileUrl} width={50} height={50} alt="Company Logo" className={`editCompanyLogo ${isActive ? "hidden" : ""}`} priority={false} id='s3CompanyLogo' unoptimized={true} />
                             )}
                             <Image src={`${previewImg ? previewImg : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg=='}`} id='logoPreview' width={50} height={50} alt="" className={`editCompanyLogo ${isActive ? "" : "hidden"}`} priority={false} />
                         </div>
