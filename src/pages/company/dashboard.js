@@ -12,11 +12,11 @@ import HeaderBar from '@/Components/AppHeader/headerbar';
 export default function CompanyDashboard() {
     const router = useRouter();
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        // The user is not authenticated, handle it here.
-          router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            // The user is not authenticated, handle it here.
+            router.push('/login');
+        },
     });
 
     const [companyData, setCompanyData] = useState('');
@@ -43,7 +43,7 @@ export default function CompanyDashboard() {
 
             setS3FileUrl(durl);
             // console.log(s3FileUrl);
-            
+
         } catch (error) {
             console.error('Error fetching company id: ', error.message);
         }
@@ -56,14 +56,14 @@ export default function CompanyDashboard() {
             const jobs = await axios.get(`/reson-api/jobs/company/${company_id}`);
             (async () => {
                 const arr = []; // Make sure arr is defined outside of the loop
-            
+
                 for (const obj of jobs.data) {
                     const jobId = obj.job_id;
                     try {
                         const response = await fetch(`/reson-api/job_result/job/${jobId}`);
                         const result = await response.json();
                         let jID, applications;
-                        if(result.length !== undefined && result.length > 0) {
+                        if (result.length !== undefined && result.length > 0) {
                             jID = result[0].job_id;
                             applications = result.length;
                         } else {
@@ -71,23 +71,23 @@ export default function CompanyDashboard() {
                             applications = 0;
                         }
                         // The 'applicants' object creation did not seem to be used, so it has been omitted.
-                        
+
                         // Now we simply add the applications count to the object
-                        arr.push({...obj, applicants: applications});
+                        arr.push({ ...obj, applicants: applications });
                     } catch (error) {
                         console.error('Fetch failed for job_id:', jobId, error);
                         // Handle the error appropriately
-                        arr.push({...obj, applicants: 0});
+                        arr.push({ ...obj, applicants: 0 });
                     }
                 }
-            
+
                 setJobData(arr); // Now setJobData is called after all fetches have completed
             })();
             // console.log('jobData', arr);
             // fetchJobApplications()
         } catch (error) {
             console.error('Error fetching jobs', error.message);
-            
+
         }
     }
 
@@ -96,8 +96,8 @@ export default function CompanyDashboard() {
     }, [])
 
     useEffect(() => {
-        if(session){
-            if(session.user.company_id != 0) {
+        if (session) {
+            if (session.user.company_id != 0) {
                 fetchCompanyData()
                 fetchCompanyJobs()
             } else {
@@ -125,72 +125,72 @@ export default function CompanyDashboard() {
         navigator.clipboard.writeText(url)
         toast.info('Job Link copied to clipboard')
     }
-      
+
 
     if (status === "loading") {
-        return <PageLoader/>
+        return <PageLoader />
     }
 
-    if(session.user.user_id === null || session.user.user_id === '') {
-    router.push('/register');
+    if (session.user.user_id === null || session.user.user_id === '') {
+        router.push('/register');
     }
 
-    return(
+    return (
         <>
             {/* Header bar */}
             <HeaderBar />
             <div className='container-fluid'>
                 <div className='row'>
                     {companyData && (
-                    <div className='col-12 col-sm-3 company-details-bar text-center'>
-                        <div className='pt-sm-5 pe-sm-3 ps-sm-3 pb-sm-2'>
-                            {s3FileUrl && isClient && (
-                                <img 
-                                    ref={logoImgRef}
-                                    width={300} 
-                                    height={128} 
-                                    alt="Company Logo" 
-                                    className='companyLogo'
-                                    onError={(e) => {
-                                        console.error('Image failed to load. URL:', s3FileUrl);
-                                        console.error('Actual src in DOM:', e.target.getAttribute('src'));
-                                    }}
-                                />
-                            )}
+                        <div className='col-12 col-sm-3 company-details-bar text-center'>
+                            <div className='pt-sm-5 pe-sm-3 ps-sm-3 pb-sm-2'>
+                                {s3FileUrl && isClient && (
+                                    <img
+                                        ref={logoImgRef}
+                                        width={300}
+                                        height={128}
+                                        alt="Company Logo"
+                                        className='companyLogo'
+                                        onError={(e) => {
+                                            console.error('Image failed to load. URL:', s3FileUrl);
+                                            console.error('Actual src in DOM:', e.target.getAttribute('src'));
+                                        }}
+                                    />
+                                )}
+                            </div>
+                            <div className='pe-2 ps-2 pt-4 pb-1'>
+                                <h2 className='company-name text-center'>{companyData.company_name}</h2>
+                            </div>
+                            <div className='pe-2 ps-2 pt-1 pb-4 text-center company-details'>
+                                <p>{companyData.company_address}</p>
+                                <p>{companyData.company_email_address}</p>
+                                <p>{companyData.company_website}</p>
+                            </div>
+                            <div className='text-center pe-2 ps-2 pt-2 pb-2'>
+                                <Link href='/company/record-welcome-message' className='profile-btn position-relative d-block'>
+                                    <Image src={'/icons/record.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
+                                    Record Welcome Message
+                                </Link>
+                            </div>
+                            <div className='text-center pe-2 ps-2 pt-2 pb-2'>
+                                <Link href='/company/welcome-message' className='profile-btn position-relative d-block'>
+                                    <Image src={'/icons/present.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
+                                    View Welcome Message
+                                </Link>
+                            </div>
+                            <div className='text-center pe-2 ps-2 pt-2 pb-2'>
+                                <Link href='/company/company-profile' className='profile-btn position-relative d-block'>
+                                    <Image src={'/icons/profile.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
+                                    View Company Profile
+                                </Link>
+                            </div>
+                            <div className='text-center pe-2 ps-2 pt-2 pb-2'>
+                                <Link href='/company/edit-company-profile' className='profile-btn position-relative d-block'>
+                                    <Image src={'/icons/edit.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
+                                    Edit Company Profile
+                                </Link>
+                            </div>
                         </div>
-                        <div className='pe-2 ps-2 pt-4 pb-1'>
-                            <h2 className='company-name text-center'>{companyData.company_name}</h2>
-                        </div>
-                        <div className='pe-2 ps-2 pt-1 pb-4 text-center company-details'>
-                            <p>{companyData.company_address}</p>
-                            <p>{companyData.company_email_address}</p>
-                            <p>{companyData.company_website}</p>
-                        </div>
-                        <div className='text-center pe-2 ps-2 pt-2 pb-2'>
-                            <Link href='/company/record-welcome-message' className='profile-btn position-relative d-block'>
-                                <Image src={'/icons/record.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
-                                Record Welcome Message
-                            </Link>
-                        </div>
-                        <div className='text-center pe-2 ps-2 pt-2 pb-2'>
-                            <Link href='/company/welcome-message' className='profile-btn position-relative d-block'>
-                                <Image src={'/icons/present.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
-                                View Welcome Message
-                            </Link>
-                        </div>
-                        <div className='text-center pe-2 ps-2 pt-2 pb-2'>
-                            <Link href='/company/company-profile' className='profile-btn position-relative d-block'>
-                                <Image src={'/icons/profile.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
-                                View Company Profile
-                            </Link>
-                        </div>
-                        <div className='text-center pe-2 ps-2 pt-2 pb-2'>
-                            <Link href='/company/edit-company-profile' className='profile-btn position-relative d-block'>
-                                <Image src={'/icons/edit.svg'} alt='record' width={'20'} height={'14'} className='dashboard-icons' />
-                                Edit Company Profile
-                            </Link>
-                        </div>
-                    </div>
                     )}
                     <div className='col-12 col-sm-9 ps-sm-5 pe-sm-5 top-content-box'>
                         <div className='row mt-5 mb-3 align-items-center'>
@@ -244,13 +244,13 @@ export default function CompanyDashboard() {
                                 </div>
                             </div>
                         ))) : (
-                        <>
-                            <div className='row'>
-                                <div className='col-12'>
-                                    <h3>No jobs found</h3>
+                            <>
+                                <div className='row'>
+                                    <div className='col-12'>
+                                        <h3>No jobs found</h3>
+                                    </div>
                                 </div>
-                            </div>
-                        </>
+                            </>
                         )}
                     </div>
                 </div>

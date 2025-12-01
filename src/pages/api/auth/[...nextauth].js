@@ -54,18 +54,38 @@ export const authOptions = {
             // Only fetch company data if GET_COMPANY_DATA is set
             if (process.env.GET_COMPANY_DATA) {
               try {
-                const getCompanyID = await axios.get(process.env.GET_COMPANY_DATA + user.user.user_id);
+                const apiUrl = process.env.GET_COMPANY_DATA + user.user.user_id;
+                console.log('Fetching company data from:', apiUrl);
+                const getCompanyID = await axios.get(apiUrl);
+                console.log('Company API response status:', getCompanyID.status);
+
                 if (getCompanyID.status == 200) {
-                  const companyData = await getCompanyID.data;
-                  console.log('Company data:', companyData);
-                  if (companyData) {
+                  // getCompanyID.data is already the data, not a promise - remove await
+                  const companyData = getCompanyID.data;
+                  console.log('Company data received:', JSON.stringify(companyData));
+
+                  if (companyData && typeof companyData === 'object') {
                     compId = companyData.company_id || 0;
+                    console.log('Extracted company_id:', compId);
+                  } else {
+                    console.log('Company data is null or not an object');
                   }
+                } else {
+                  console.warn('Company API returned non-200 status:', getCompanyID.status);
                 }
               } catch (error) {
                 console.error('Error fetching company data:', error.message);
+                if (error.response) {
+                  console.error('Error response status:', error.response.status);
+                  console.error('Error response data:', error.response.data);
+                }
+                if (error.request) {
+                  console.error('No response received. Request:', error.request);
+                }
                 // Continue with compId = 0 if company fetch fails
               }
+            } else {
+              console.warn('GET_COMPANY_DATA environment variable is not set');
             }
 
             const usr = {
@@ -75,6 +95,7 @@ export const authOptions = {
               "user_email": user.user.user_email_address
             }
 
+            console.log('Final user object being returned:', JSON.stringify(usr));
             return usr;
           } else {
             console.log('Login failed - status is not true');
