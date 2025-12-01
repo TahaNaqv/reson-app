@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from 'react';
+import { React, useState, useEffect, useRef } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
@@ -19,6 +19,7 @@ export default function EditCompanyProfile() {
     const [s3FileUrl, setS3FileUrl] = useState('');
     const [isActive, setIsActive] = useState(false);
     const [previewImg, setPreviewImg] = useState('');
+    const logoImgRef = useRef(null);
 
     const fetchCompanyData = async () => {
         try {
@@ -53,7 +54,14 @@ export default function EditCompanyProfile() {
                 router.push('/company/create-profile')
             }
         }
-    }, [session]) 
+    }, [session])
+
+    // Set src directly on img element to bypass React's HTML encoding
+    useEffect(() => {
+        if (s3FileUrl && logoImgRef.current) {
+            logoImgRef.current.src = s3FileUrl;
+        }
+    }, [s3FileUrl]) 
 
     const handleEditSubmit = async (event) => {
         event.preventDefault();
@@ -162,7 +170,17 @@ export default function EditCompanyProfile() {
                             </label>
                             <input type='file' id='company_logo' className='hidden' name='company_logo' accept=".jpg, .jpeg, .png" onChange={handlePreview} />
                             {s3FileUrl && (
-                                <img src={s3FileUrl} width={50} height={50} alt="Company Logo" className={`editCompanyLogo ${isActive ? "hidden" : ""}`} id='s3CompanyLogo' />
+                                <img 
+                                    ref={logoImgRef}
+                                    width={50} 
+                                    height={50} 
+                                    alt="Company Logo" 
+                                    className={`editCompanyLogo ${isActive ? "hidden" : ""}`} 
+                                    id='s3CompanyLogo'
+                                    onError={(e) => {
+                                        console.error('Image failed to load. URL:', s3FileUrl);
+                                    }}
+                                />
                             )}
                             <Image src={`${previewImg ? previewImg : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg=='}`} id='logoPreview' width={50} height={50} alt="" className={`editCompanyLogo ${isActive ? "" : "hidden"}`} priority={false} />
                         </div>

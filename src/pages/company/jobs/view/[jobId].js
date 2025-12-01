@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from 'react';
+import { React, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import Image from 'next/image';
@@ -24,6 +24,7 @@ export default function ViewJobAsRecruiter() {
     const [jobData, setJobData] = useState('');
     const [companyData, setCompanyData] = useState('');
     const [s3FileUrl, setS3FileUrl] = useState('');
+    const logoImgRef = useRef(null);
 
     const fetchJobData = async () => {
         try {
@@ -66,7 +67,14 @@ export default function ViewJobAsRecruiter() {
                 router.push('/company/post-job-vacancy')
             }
         }
-    }, [session]) 
+    }, [session])
+
+    // Set src directly on img element to bypass React's HTML encoding
+    useEffect(() => {
+        if (s3FileUrl && logoImgRef.current) {
+            logoImgRef.current.src = s3FileUrl;
+        }
+    }, [s3FileUrl]) 
 
     if (status === "loading") {
         return <PageLoader/>
@@ -93,7 +101,16 @@ export default function ViewJobAsRecruiter() {
                                 <div className='row'>
                                     <div className='col-sm-3 text-end'>
                                         {s3FileUrl && (
-                                        <img src={s3FileUrl} width={120} height={100} alt="Company Logo" className='companyLogo' />
+                                        <img 
+                                            ref={logoImgRef}
+                                            width={120} 
+                                            height={100} 
+                                            alt="Company Logo" 
+                                            className='companyLogo'
+                                            onError={(e) => {
+                                                console.error('Image failed to load. URL:', s3FileUrl);
+                                            }}
+                                        />
                                         )}
                                     </div>
                                     <div className='col-sm-9'>

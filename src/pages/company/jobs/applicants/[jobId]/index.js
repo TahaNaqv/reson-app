@@ -1,4 +1,4 @@
-import { React, useState, useEffect } from 'react';
+import { React, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
 import { toast } from 'react-toastify';
@@ -27,6 +27,7 @@ export default function JobApplicants() {
     const [candidateIds, setCandidateIds] = useState([]);
     const [candidateDetails, setCandidateDetails] = useState([]);
     const [s3FileUrl, setS3FileUrl] = useState('');
+    const logoImgRef = useRef(null);
 
     const fetchCompanyData = async () => {
         try {
@@ -101,6 +102,13 @@ export default function JobApplicants() {
             }
         }
     }, [session])
+
+    // Set src directly on img element to bypass React's HTML encoding
+    useEffect(() => {
+        if (s3FileUrl && logoImgRef.current) {
+            logoImgRef.current.src = s3FileUrl;
+        }
+    }, [s3FileUrl])
       
 
     if (status === "loading") {
@@ -121,7 +129,16 @@ export default function JobApplicants() {
                     <div className='col-12 col-sm-3 company-details-bar text-center'>
                         <div className='pt-sm-5 pe-sm-3 ps-sm-3 pb-sm-2'>
                             {s3FileUrl && (
-                                <img src={s3FileUrl} width={300} height={128} alt="Company Logo" className='companyLogo' />
+                                <img 
+                                    ref={logoImgRef}
+                                    width={300} 
+                                    height={128} 
+                                    alt="Company Logo" 
+                                    className='companyLogo'
+                                    onError={(e) => {
+                                        console.error('Image failed to load. URL:', s3FileUrl);
+                                    }}
+                                />
                             )}
                         </div>
                         <div className='pe-2 ps-2 pt-4 pb-1'>
