@@ -22,6 +22,7 @@ export default function CompanyDashboard() {
     const [companyData, setCompanyData] = useState('');
     const [jobData, setJobData] = useState([]);
     const [s3FileUrl, setS3FileUrl] = useState('');
+    const [isClient, setIsClient] = useState(false);
     const logoImgRef = useRef(null);
 
     const fetchCompanyData = async () => {
@@ -91,6 +92,10 @@ export default function CompanyDashboard() {
     }
 
     useEffect(() => {
+        setIsClient(true);
+    }, [])
+
+    useEffect(() => {
         if(session){
             if(session.user.company_id != 0) {
                 fetchCompanyData()
@@ -103,10 +108,17 @@ export default function CompanyDashboard() {
 
     // Set src directly on img element to bypass React's HTML encoding
     useEffect(() => {
-        if (s3FileUrl && logoImgRef.current) {
-            logoImgRef.current.src = s3FileUrl;
+        if (s3FileUrl && logoImgRef.current && isClient) {
+            // Use setAttribute to bypass React's encoding completely
+            // Small delay to ensure DOM is fully ready
+            const timer = setTimeout(() => {
+                if (logoImgRef.current) {
+                    logoImgRef.current.setAttribute('src', s3FileUrl);
+                }
+            }, 10);
+            return () => clearTimeout(timer);
         }
-    }, [s3FileUrl])
+    }, [s3FileUrl, isClient])
 
     const copyJobLink = (e) => {
         let url = e.target.innerText.slice(20)
@@ -132,7 +144,7 @@ export default function CompanyDashboard() {
                     {companyData && (
                     <div className='col-12 col-sm-3 company-details-bar text-center'>
                         <div className='pt-sm-5 pe-sm-3 ps-sm-3 pb-sm-2'>
-                            {s3FileUrl && (
+                            {s3FileUrl && isClient && (
                                 <img 
                                     ref={logoImgRef}
                                     width={300} 
@@ -141,6 +153,7 @@ export default function CompanyDashboard() {
                                     className='companyLogo'
                                     onError={(e) => {
                                         console.error('Image failed to load. URL:', s3FileUrl);
+                                        console.error('Actual src in DOM:', e.target.getAttribute('src'));
                                     }}
                                 />
                             )}
