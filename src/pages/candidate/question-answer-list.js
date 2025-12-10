@@ -20,6 +20,8 @@ export default function Welcome() {
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [userActions, setUserActions] = useState(true);
     const [showSubmit, setShowSubmit] = useState(false);
+    const isMountedRef = useRef(true);
+    const pollingTimeoutRef = useRef(null);
 
     useEffect(() => {
         // Retrieve candidate details from localStorage on component mount
@@ -134,6 +136,20 @@ export default function Welcome() {
             welcomeVideo();
         }
     }, [currentQuestionIndex === questionDetails.length - 1, questionDetails[currentQuestionIndex], companyDetails, jobDetails, answerDetails]);
+
+    // Cleanup on component unmount to prevent memory leaks
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+            // Clear any pending polling timeouts
+            if (pollingTimeoutRef.current) {
+                clearTimeout(pollingTimeoutRef.current);
+                pollingTimeoutRef.current = null;
+            }
+        };
+    }, [])
 
 
     const handleNextQuestion = () => {
@@ -373,9 +389,11 @@ export default function Welcome() {
                 const actualJobName = transcriptionResponse.actualJobName || s3VideoKey;
 
                 // Start polling in background using the actual AWS job name
+                // Note: pollTranscriptionStatus uses recursive setTimeout, cleanup handled in useEffect
                 pollTranscriptionStatus(
                     actualJobName,
                     (status, retryCount) => {
+                        if (!isMountedRef.current) return; // Skip if component unmounted
                         if (retryCount === 0) {
                             toast.info('Transcription in progress. Please wait...');
                         } else if (retryCount % TRANSCRIPTION_CONFIG.STATUS_UPDATE_INTERVAL === 0) {
@@ -383,6 +401,7 @@ export default function Welcome() {
                         }
                     },
                     async (completedJob) => {
+                        if (!isMountedRef.current) return; // Skip if component unmounted
                         toast.success('Transcription completed successfully');
 
                         // Automatically fetch and save transcript to database
@@ -393,17 +412,40 @@ export default function Welcome() {
                                     const saved = await saveTranscriptToDatabase(transcriptText, 'answer', answerId);
                                     if (saved) {
                                         console.log('Transcript automatically saved to database');
+                                        // Show success notification (non-intrusive)
+                                        toast.success('Transcript saved to database', { autoClose: 2000 });
+                                    } else {
+                                        console.error('Failed to save transcript to database');
+                                        // Show error notification for save failure
+                                        toast.error('Failed to save transcript. Please try again later.', { autoClose: 3000 });
                                     }
+                                } else {
+                                    console.warn('Transcript text is empty or could not be extracted');
+                                    toast.warn('Transcript completed but could not be extracted', { autoClose: 3000 });
                                 }
                             } catch (error) {
-                                console.error('Error auto-saving transcript:', error);
-                                // Don't show error to user, it's background operation
+                                console.error('Error auto-saving transcript:', {
+                                    error: error.message,
+                                    answerId: answerId,
+                                    s3Key: s3VideoKey,
+                                    stack: error.stack
+                                });
+                                // Show error notification for critical failures
+                                toast.error('Error saving transcript: ' + (error.message || 'Unknown error'), { autoClose: 4000 });
                             }
+                        } else {
+                            console.warn('No answerId available to save transcript');
                         }
                     },
                     (error) => {
+                        if (!isMountedRef.current) return; // Skip if component unmounted
+                        console.error('Transcription polling error:', {
+                            error: error.message,
+                            jobName: actualJobName,
+                            stack: error.stack
+                        });
                         const errorMessage = getTranscriptionErrorMessage(error);
-                        toast.error(errorMessage);
+                        toast.error(errorMessage, { autoClose: 5000 });
                     }
                 );
             } else {
@@ -411,9 +453,15 @@ export default function Welcome() {
                 toast.warn('Unexpected response from transcription service');
             }
         } catch (transcriptionError) {
-            console.error('Error starting transcription:', transcriptionError);
+            console.error('Error starting transcription:', {
+                error: transcriptionError.message,
+                s3VideoUrl: s3VideoUrl,
+                userFolder: userFolder,
+                s3VideoKey: s3VideoKey,
+                stack: transcriptionError.stack
+            });
             const errorMessage = getTranscriptionErrorMessage(transcriptionError);
-            toast.error(errorMessage);
+            toast.error(errorMessage, { autoClose: 5000 });
             setUserActions(true);
             return false;
         }
@@ -455,8 +503,15 @@ export default function Welcome() {
                     });
                 }
             } catch (error) {
+                console.error('Error saving answer:', {
+                    error: error.message,
+                    answerTitle: answerTitle,
+                    candidateId: candidateDetails?.candidateId,
+                    jobId: jobId?.job_id,
+                    stack: error.stack
+                });
+                toast.error('Error saving answer: ' + (error.message || 'Unknown error'), { autoClose: 4000 });
                 setUserActions(true);
-                console.error('Error posting answer', error.message);
             }
         }
     }

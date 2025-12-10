@@ -2,7 +2,26 @@ import { TranscribeClient, StartTranscriptionJobCommand } from "@aws-sdk/client-
 import { TRANSCRIPTION_CONFIG, SUPPORTED_MEDIA_FORMATS } from "@/config/transcription";
 import { generateUniqueJobName, getTranscriptionErrorMessage } from "@/utils/transcription";
 
-// Convert HTTPS URL to S3 URI format
+/**
+ * Convert HTTPS URL to S3 URI format
+ * 
+ * AWS Transcribe requires media files to be specified as S3 URIs (s3://bucket/key),
+ * but the frontend typically provides HTTPS URLs (https://bucket.s3.region.amazonaws.com/key).
+ * 
+ * This function converts HTTPS URLs to S3 URI format by:
+ * 1. Checking if already in S3 format (s3://) - return as-is
+ * 2. Parsing the HTTPS URL to extract the path
+ * 3. Constructing S3 URI: s3://{bucketName}/{path}
+ * 
+ * Examples:
+ * - Input: "https://bucket.s3.us-east-1.amazonaws.com/folder/video.mp4"
+ * - Output: "s3://bucket/folder/video.mp4"
+ * 
+ * @param {string} httpsUrl - The HTTPS URL of the media file
+ * @param {string} bucketName - The S3 bucket name
+ * @returns {string} - S3 URI format (s3://bucket/key)
+ * @throws {Error} - If URL or bucket name is invalid
+ */
 function convertToS3Uri(httpsUrl, bucketName) {
     if (!httpsUrl || !bucketName) {
         throw new Error('Invalid URL or bucket name');
@@ -17,6 +36,7 @@ function convertToS3Uri(httpsUrl, bucketName) {
     // Format: https://bucket.s3.region.amazonaws.com/path or https://bucket.s3.amazonaws.com/path
     try {
         const url = new URL(httpsUrl);
+        // Remove leading slash from pathname to avoid double slashes in S3 URI
         const path = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
         return `s3://${bucketName}/${path}`;
     } catch (error) {
@@ -96,7 +116,10 @@ export default async function handler(req, res) {
         const s3MediaUri = convertToS3Uri(Key.media, process.env.BUCKET_NAME);
 
         // Generate unique job name to prevent collisions
-        // Use the original key as base but add uniqueness
+        // AWS Transcribe job names must be unique and can only contain: letters, numbers, dots, underscores, hyphens
+        // The frontend may provide a job name based on S3 key, but we need to ensure uniqueness
+        // Strategy: Sanitize the base key, then append timestamp and random string
+        // Example: "video.mp4" -> "video_mp4_1234567890_abc123"
         const baseKey = Key.jobName.replace(/[^a-zA-Z0-9._-]/g, '_');
         const jobName = generateUniqueJobName(baseKey);
 

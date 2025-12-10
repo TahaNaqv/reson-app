@@ -11,7 +11,8 @@ import PageLoader from '@/Components/Loader/pageloader';
 import HeaderBar from '@/Components/AppHeader/headerbar';
 import Timer from '@/Components/Timer/timer';
 import VideoPlayer from '@/Components/VideoPlayer/player';
-import { startTranscription, getTranscriptionErrorMessage } from '@/utils/transcription';
+import { startTranscription, pollTranscriptionStatus, fetchAndExtractTranscript, getTranscriptionErrorMessage } from '@/utils/transcription';
+import { TRANSCRIPTION_CONFIG } from '@/config/transcription';
 
 export default function RecordWelcomeMessageCEO() {
     const router = useRouter();
@@ -187,16 +188,60 @@ export default function RecordWelcomeMessageCEO() {
 
             if (transcriptionResponse.status === 'true') {
                 toast.success('Transcription started successfully');
-                // Note: actualJobName is available in transcriptionResponse.actualJobName
-                // If polling is added in the future, use actualJobName instead of s3VideoKey
+
+                // Extract actual AWS job name from response (critical for status polling)
+                const actualJobName = transcriptionResponse.actualJobName || s3VideoKey;
+
+                // Start polling in background using the actual AWS job name
+                pollTranscriptionStatus(
+                    actualJobName,
+                    (status, retryCount) => {
+                        if (retryCount === 0) {
+                            toast.info('Transcription in progress. Please wait...');
+                        } else if (retryCount % TRANSCRIPTION_CONFIG.STATUS_UPDATE_INTERVAL === 0) {
+                            toast.info('Transcription still processing. Please wait...');
+                        }
+                    },
+                    async (completedJob) => {
+                        toast.success('Transcription completed successfully');
+
+                        // Fetch transcript (CEO video transcript may not be stored in database)
+                        try {
+                            const transcriptText = await fetchAndExtractTranscript(s3VideoKey, userFolder);
+                            if (transcriptText) {
+                                console.log('CEO video transcript extracted:', transcriptText.substring(0, 100) + '...');
+                                // Note: CEO video transcript is not currently stored in company table
+                                // If needed in the future, add company_ceo_video_transcript field
+                            }
+                        } catch (error) {
+                            console.error('Error fetching CEO video transcript:', error);
+                            // Don't show error to user, it's background operation
+                        }
+                    },
+                    (error) => {
+                        console.error('Transcription polling error:', {
+                            error: error.message,
+                            jobName: actualJobName,
+                            stack: error.stack
+                        });
+                        const errorMessage = getTranscriptionErrorMessage(error);
+                        toast.error(errorMessage, { autoClose: 5000 });
+                    }
+                );
             } else {
                 console.warn('Unexpected transcription response:', transcriptionResponse);
                 toast.warn('Unexpected response from transcription service');
             }
         } catch (transcriptionError) {
-            console.error('Error starting transcription:', transcriptionError);
+            console.error('Error starting transcription:', {
+                error: transcriptionError.message,
+                s3VideoUrl: s3VideoUrl,
+                userFolder: userFolder,
+                s3VideoKey: s3VideoKey,
+                stack: transcriptionError.stack
+            });
             const errorMessage = getTranscriptionErrorMessage(transcriptionError);
-            toast.error(errorMessage);
+            toast.error(errorMessage, { autoClose: 5000 });
             setUserActions(true);
             return false;
         }
@@ -237,7 +282,12 @@ export default function RecordWelcomeMessageCEO() {
                     });
                 }
             } catch (error) {
-                console.error('Error getting company details', error.message);
+                console.error('Error updating company:', {
+                    error: error.message,
+                    companyId: session.user.company_id,
+                    stack: error.stack
+                });
+                toast.error('Error updating company: ' + (error.message || 'Unknown error'), { autoClose: 4000 });
                 setUserActions(true);
             }
         }

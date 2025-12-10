@@ -5,6 +5,9 @@ import { TRANSCRIPTION_CONFIG } from "@/config/transcription";
  * Cleanup endpoint for old transcription jobs
  * Deletes completed or failed jobs older than configured days
  * Can be called manually or scheduled via cron
+ * 
+ * SECURITY: Requires API key authentication via X-API-Key header or apiKey in request body
+ * Set TRANSCRIPTION_CLEANUP_API_KEY environment variable to enable authentication
  */
 export default async function handler(req, res) {
     // Only allow POST requests for cleanup (security)
@@ -13,6 +16,34 @@ export default async function handler(req, res) {
             status: 'false',
             message: 'Method not allowed. Use POST to trigger cleanup.'
         });
+    }
+
+    // Authentication: Check for API key if configured
+    const requiredApiKey = process.env.TRANSCRIPTION_CLEANUP_API_KEY;
+    if (requiredApiKey) {
+        const providedApiKey = req.headers['x-api-key'] || req.body?.apiKey;
+
+        if (!providedApiKey) {
+            console.warn('Cleanup endpoint accessed without API key');
+            return res.status(401).json({
+                status: 'false',
+                message: 'Unauthorized. API key required.',
+                error: 'Missing X-API-Key header or apiKey in request body'
+            });
+        }
+
+        if (providedApiKey !== requiredApiKey) {
+            console.warn('Cleanup endpoint accessed with invalid API key');
+            return res.status(403).json({
+                status: 'false',
+                message: 'Forbidden. Invalid API key.',
+                error: 'API key authentication failed'
+            });
+        }
+
+        console.log('Cleanup endpoint accessed with valid API key');
+    } else {
+        console.warn('Cleanup endpoint accessed without API key protection. Set TRANSCRIPTION_CLEANUP_API_KEY environment variable.');
     }
 
     // Validate environment variables
@@ -139,6 +170,15 @@ export default async function handler(req, res) {
             nextToken = failedListResponse.NextToken;
             hasMore = !!nextToken;
         }
+
+        // Log cleanup operation for audit trail
+        console.log('Cleanup operation completed:', {
+            deletedCount: deletedCount,
+            errorCount: errorCount,
+            cutoffDate: cutoffDate.toISOString(),
+            cleanupDays: cleanupDays,
+            timestamp: new Date().toISOString()
+        });
 
         return res.status(200).json({
             status: 'true',
