@@ -11,18 +11,19 @@ import PageLoader from '@/Components/Loader/pageloader';
 import HeaderBar from '@/Components/AppHeader/headerbar';
 import Timer from '@/Components/Timer/timer';
 import VideoPlayer from '@/Components/VideoPlayer/player';
+import { startTranscription, getTranscriptionErrorMessage } from '@/utils/transcription';
 
 export default function RecordWelcomeMessageCEO() {
     const router = useRouter();
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        // The user is not authenticated, handle it here.
-          router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            // The user is not authenticated, handle it here.
+            router.push('/login');
+        },
     });
 
-    
+
     // const mimeType = 'video/mp4;codecs=avc1,mp4a';
     const [stream, setStream] = useState(null);
     const mediaRecorder = useRef(null);
@@ -40,7 +41,7 @@ export default function RecordWelcomeMessageCEO() {
     // Camera Permission
     const getCameraPermission = async () => {
         // Should I keep the recorded video null?
-        if(recordedVideo) {
+        if (recordedVideo) {
             setRecordedVideo(null)
         }
         if ("MediaRecorder" in window) {
@@ -91,11 +92,9 @@ export default function RecordWelcomeMessageCEO() {
     }
 
     const startRecording = async () => {
-        // const { transcribeData } = await axios.get('/api/transcribe/stream');
-        // console.log(transcribeData);
         setRecordingStatus("recording");
 
-        if(stream) {
+        if (stream) {
             const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a') ? 'video/mp4;codecs=avc1,mp4a' : 'video/webm;codecs=vp8,opus';
             const media = new MediaRecorder(stream, { mimeType });
             mediaRecorder.current = media;
@@ -125,40 +124,30 @@ export default function RecordWelcomeMessageCEO() {
                     type: "video/mp4",
                 });
 
-                // console.log("file: ", file);
                 setVideoFile(file);
-
                 setRecordedVideo(videoUrl);
-                // console.log("videoUrl: ", videoUrl);
-                // uploadFile(videoBlob);
-                // console.log({ loading, downloadURL, uploading, progress, coconutJobId });
-
                 setVideoChunks([]);
             };
             mediaRecorder.current.stop();
             stream.getTracks().forEach((track) => track.stop());
-            // console.log('tracks', stream.getTracks())
         }
     };
 
     const handleVideoUpload = async () => {
         setUserActions(false);
-        // console.log(userActions)
-        // console.log('Get the company data');
-        // console.log('video: ', recordedVideo);
         let s3VideoUrl, s3VideoKey, s3VideoURI
         const companyData = axios.get(`/reson-api/company/${session.user.company_id}`);
         const data = (await companyData).data;
         const userFolder = 'user_id_' + session.user.user_id + '/company'
 
-        if(session.user.company_id) {
+        if (session.user.company_id) {
             const file = videoFile;
             const filename = file.name;
             const fileType = encodeURIComponent('video/mp4')
             toast.info('Please wait while we process the request');
 
             // Delete old video if it exists
-            if(data.company_ceo_video_key) {
+            if (data.company_ceo_video_key) {
                 const resp = await fetch(
                     `/api/delete?file=${data.company_ceo_video_key}&fileType=${fileType}&folder=${userFolder}`
                 )
@@ -179,7 +168,7 @@ export default function RecordWelcomeMessageCEO() {
             })
             if (upload.ok) {
                 toast.success('CEO video uploaded successfully')
-                toast.info('Sending video for transcription', {delay: 500});
+                toast.info('Sending video for transcription', { delay: 500 });
             } else {
                 setUserActions(true);
                 toast.error('CEO video upload failed. Please try again later')
@@ -191,17 +180,28 @@ export default function RecordWelcomeMessageCEO() {
             s3VideoKey = key
         }
 
-        const transcription = await fetch(
-            `/api/transcribe?media=${s3VideoUrl}&outputBucket=${userFolder}&jobName=${s3VideoKey}`
-        )
-        const transcriptionResponse = await transcription.json()
+        // Start transcription with error handling
+        try {
+            toast.info('Starting transcription...');
+            const transcriptionResponse = await startTranscription(s3VideoUrl, userFolder, s3VideoKey);
 
-        if(transcriptionResponse.status === 'true') {
-            toast.info('Transcription of video started');
-
+            if (transcriptionResponse.status === 'true') {
+                toast.success('Transcription started successfully');
+                // Note: actualJobName is available in transcriptionResponse.actualJobName
+                // If polling is added in the future, use actualJobName instead of s3VideoKey
+            } else {
+                console.warn('Unexpected transcription response:', transcriptionResponse);
+                toast.warn('Unexpected response from transcription service');
+            }
+        } catch (transcriptionError) {
+            console.error('Error starting transcription:', transcriptionError);
+            const errorMessage = getTranscriptionErrorMessage(transcriptionError);
+            toast.error(errorMessage);
+            setUserActions(true);
+            return false;
         }
 
-        if(s3VideoKey){
+        if (s3VideoKey) {
             try {
                 var raw = {
                     "user_id": data.user_id,
@@ -227,15 +227,14 @@ export default function RecordWelcomeMessageCEO() {
                     "created_date": data.created_date,
                     "last_modified_date": new Date()
                 }
-                // console.log(raw);
 
                 const response = await axios.put(`/reson-api/company/${session.user.company_id}`, raw);
-                if(response.status === 200) {
+                if (response.status === 200) {
                     toast.success('Company video updated successfully', {
                         onClose: () => {
                             router.push('/company/welcome-message');
                         },
-                        });
+                    });
                 }
             } catch (error) {
                 console.error('Error getting company details', error.message);
@@ -256,111 +255,111 @@ export default function RecordWelcomeMessageCEO() {
     };
 
     useEffect(() => {
-        if(session){
-            // console.log(mimeType)
+        if (session) {
+            // Session loaded
         }
-    }, [session]) 
+    }, [session])
 
     if (status === "loading") {
-        return <PageLoader/>
+        return <PageLoader />
     }
 
-    if(session.user.user_id === null || session.user.user_id === '') {
-    router.push('/register');
+    if (session.user.user_id === null || session.user.user_id === '') {
+        router.push('/register');
     }
-      
 
-    return(
+
+    return (
         <>
-        {/* Header bar */}
-        <HeaderBar />
-        <div className='container'>
-            <div className='row mb-3'>
-                <div className='col-12 top-content-box'>
-                    <h1 className='text-center mt-5 mb-2 body-heading'>Welcome from the CEO</h1>
-                    <h3 className='text-center mt-3 mb-3 '>Suggested Intro Script</h3>
-                    <div className='row'>
-                        <div className='col-12 col-sm-2'></div>
-                        <div className='col-12 col-sm-8'>
-                            <p className='sub-text text-center mt-2 mb-2'>
-                            {`It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like)`}. 
-                            </p>
+            {/* Header bar */}
+            <HeaderBar />
+            <div className='container'>
+                <div className='row mb-3'>
+                    <div className='col-12 top-content-box'>
+                        <h1 className='text-center mt-5 mb-2 body-heading'>Welcome from the CEO</h1>
+                        <h3 className='text-center mt-3 mb-3 '>Suggested Intro Script</h3>
+                        <div className='row'>
+                            <div className='col-12 col-sm-2'></div>
+                            <div className='col-12 col-sm-8'>
+                                <p className='sub-text text-center mt-2 mb-2'>
+                                    {`It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like)`}.
+                                </p>
+                            </div>
+                            <div className='col-12 col-sm-2'></div>
                         </div>
-                        <div className='col-12 col-sm-2'></div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div className='container'>
-            <div className='row mb-5'>
-                <div className='col-12 col-sm-2'></div>
-                <div className='col-12 col-sm-8 position-relative'>
-                    <div className='videoPlayer position-relative'>
-                        {countdown > 0 ? 
-                            <div className='videoCountdown'>
-                                <Timer time={3} />
-                            </div>
-                            : ""
-                        }
-                        {!recordedVideo ? (
-                            <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
-                        ) : null}
+            <div className='container'>
+                <div className='row mb-5'>
+                    <div className='col-12 col-sm-2'></div>
+                    <div className='col-12 col-sm-8 position-relative'>
+                        <div className='videoPlayer position-relative'>
+                            {countdown > 0 ?
+                                <div className='videoCountdown'>
+                                    <Timer time={3} />
+                                </div>
+                                : ""
+                            }
+                            {!recordedVideo ? (
+                                <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
+                            ) : null}
 
-                        {recordedVideo ? (
-                            <div className="recorded-player">
-                                {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
-                                <VideoPlayer {...videoJsOptions} />
-                            </div>
-                        ) : null}
-                    </div>
-                    <div className='videoControls position-absolute'>
-                        {!permission && !permissionClicked ? (
-                            <>
-                            <div className='enablePermission'>
-                                <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
-                                <p>Cam & Mic are not active</p>
-                            </div>
-                            <div className='requestPermission' onClick={getCameraPermission}>
-                                Request Permission
-                            </div>
-                            </>
-                        ) : null}
-                        {permission && recordingStatus === "inactive" ? (
-                            <div className='recordBtn' onClick={handleStartRecording}>
-                                <div className='recordVideo'></div>
-                            </div>
-                        ) : null}
-                        {recordingStatus === "recording" ? (
-                            <div className='recordBtn active' onClick={stopRecording}>
-                                <div className='recordVideo'></div>
-                            </div>
-                        ) : null}
-                        {recordedVideo ? (
-                            <>
-                            <div id='userActionVideos'>
-                                {userActions ? (
+                            {recordedVideo ? (
+                                <div className="recorded-player">
+                                    {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
+                                    <VideoPlayer {...videoJsOptions} />
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className='videoControls position-absolute'>
+                            {!permission && !permissionClicked ? (
                                 <>
-                                <p className='looksGood'>Looks Good?</p>
-                                <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
-                                    Yes
-                                </div>
-                                <div className='discardBtn roundBtn' onClick={getCameraPermission}>
-                                    No
-                                </div>
+                                    <div className='enablePermission'>
+                                        <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
+                                        <p>Cam & Mic are not active</p>
+                                    </div>
+                                    <div className='requestPermission' onClick={getCameraPermission}>
+                                        Request Permission
+                                    </div>
                                 </>
-                                ) : (
-                                    <>
-                                    <p className='waiting looksGood'>Please wait...</p>
-                                    </>
-                                )}
-                            </div>
-                        </>
-                        ) : null}
+                            ) : null}
+                            {permission && recordingStatus === "inactive" ? (
+                                <div className='recordBtn' onClick={handleStartRecording}>
+                                    <div className='recordVideo'></div>
+                                </div>
+                            ) : null}
+                            {recordingStatus === "recording" ? (
+                                <div className='recordBtn active' onClick={stopRecording}>
+                                    <div className='recordVideo'></div>
+                                </div>
+                            ) : null}
+                            {recordedVideo ? (
+                                <>
+                                    <div id='userActionVideos'>
+                                        {userActions ? (
+                                            <>
+                                                <p className='looksGood'>Looks Good?</p>
+                                                <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
+                                                    Yes
+                                                </div>
+                                                <div className='discardBtn roundBtn' onClick={getCameraPermission}>
+                                                    No
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className='waiting looksGood'>Please wait...</p>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
                     </div>
+                    <div className='col-12 col-sm-2'></div>
                 </div>
-                <div className='col-12 col-sm-2'></div>
             </div>
-        </div>
         </>
     );
 }

@@ -10,11 +10,11 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 export default function ViewCompanyProfile() {
     const router = useRouter();
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        // The user is not authenticated, handle it here.
-          router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            // The user is not authenticated, handle it here.
+            router.push('/login');
+        },
     });
 
     const [companyData, setCompanyData] = useState('');
@@ -39,15 +39,15 @@ export default function ViewCompanyProfile() {
 
             setS3FileUrl(durl);
             // console.log(s3FileUrl);
-            
+
         } catch (error) {
             console.error('Error fetching company id: ', error.message);
         }
     }
 
     useEffect(() => {
-        if(session){
-            if(session.user.company_id != 0) {
+        if (session) {
+            if (session.user.company_id != 0) {
                 fetchCompanyData()
             } else {
                 router.push('/company/create-profile')
@@ -60,10 +60,10 @@ export default function ViewCompanyProfile() {
         if (s3FileUrl && logoImgRef.current) {
             logoImgRef.current.src = s3FileUrl;
         }
-    }, [s3FileUrl]) 
-      
+    }, [s3FileUrl])
 
-    return(
+
+    return (
         <>
             {companyData && (
                 <div className='container' id='view-company-profile'>
@@ -80,11 +80,11 @@ export default function ViewCompanyProfile() {
                         </div>
                         <div className='col-12 col-sm-3'>
                             {s3FileUrl && (
-                                <img 
+                                <img
                                     ref={logoImgRef}
-                                    width={300} 
-                                    height={128} 
-                                    alt="Company Logo" 
+                                    width={300}
+                                    height={128}
+                                    alt="Company Logo"
                                     className='companyLogo'
                                     onError={(e) => {
                                         console.error('Image failed to load. URL:', s3FileUrl);

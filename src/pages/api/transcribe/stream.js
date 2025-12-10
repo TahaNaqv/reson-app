@@ -1,94 +1,33 @@
+/**
+ * Streaming Transcription Endpoint
+ * 
+ * TODO: This endpoint is not currently implemented.
+ * 
+ * Streaming transcription allows real-time transcription of audio streams.
+ * This would be useful for live audio transcription scenarios.
+ * 
+ * Current implementation uses batch transcription via /api/transcribe/index.js
+ * which is more suitable for video files.
+ * 
+ * To implement streaming transcription:
+ * 1. Set up WebSocket connection to AWS Transcribe Streaming
+ * 2. Stream audio chunks in real-time
+ * 3. Receive and process transcription results as they arrive
+ * 4. Handle connection lifecycle and errors
+ * 
+ * See AWS Transcribe Streaming documentation:
+ * https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html
+ */
+
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
-import { S3RequestPresigner } from "@aws-sdk/s3-request-presigner";
-import { Sha256 } from "@aws-crypto/sha256-browser";
 
-export default async function handler(req,res) {
-    const awsEndpoint = 'transcribestreaming.' + process.env.REGION + '.amazonaws.com:8443';
-    const hash = new Sha256();
-    const raw = {
-      method: 'GET',
-      host: awsEndpoint,
-      path: '/stream-transcription',
-      service: 'transcribe',
-      payload: hash.update('', 'utf8'),
-      options: {
-        key: process.env.ACCESS_KEY,
-        secret: process.env.SECRET_KEY,
-        region: process.env.REGION,
-        protocol: 'wss',
-        expires: 300,
-        query: 'language-code=en-US&media-encoding=pcm&sample-rate=44100',
-      },
-    }
+export default async function handler(req, res) {
+    // TODO: Implement streaming transcription
+    // This endpoint is currently a placeholder
 
-    console.log(`https://${awsEndpoint}`);
-    const response = await fetch(`https://${awsEndpoint}`, raw);
-    console.log(await response.json());
-    return response
-    // const client = new TranscribeStreamingClient ({
-    //     endpoint: awsEndpoint,
-    //     credentials: {
-    //       region: process.env.REGION,
-    //       accessKeyId: process.env.ACCESS_KEY,
-    //       secretAccessKey: process.env.SECRET_KEY,
-    //     },
-    //     signer: () => {
-    //       return {
-    //         presign: () => {
-    //           return Promise.resolve({ protocol: "wss", hostname: "", path: url.slice(5) })
-    //         },
-    //       }
-    //     }
-    // });
-
-    // console.log(client);
-
-    
-
-    // const Key = req.query.audio;
-    // console.log(Key)
-
-    // const clientParams = {
-    //     LanguageCode: "en-US",
-    //     MediaEncoding: "pcm",
-    //     MediaSampleRateHertz: "16000",
-    //     AudioStream: (async function* () {
-    //         for await (const chunk of Key) {
-    //           yield {AudioEvent: {AudioChunk: chunk}};
-    //         }
-    //       })(),
-    // };
-
-    // console.log(clientParams)
-
-    // const command = new StartStreamTranscriptionCommand(clientParams);
-
-    // try {
-    //     const response = await client.send(command);
-    //     console.log('response', response)
-    //     for await (const event of response.TranscriptResultStream) {
-    //         console.log('event', event);
-    //         // console.log(JSON.stringify(event));
-    //     }
-    //     // res.status(200).json({
-    //     //     "status": 'Old video deleted successfully',
-    //     //     "response": response
-    //     // })
-    //   } catch (err) {
-    //     console.log(err)
-    //     res.status(200).json({
-    //         "status": 'Stream Failed',
-    //         "response": err
-    //     })
-    //   }
-    // // const awsEndpoint = 'transcribestreaming.' + process.env.REGION + '.amazonaws.com:8443';
-    // // const preSignedUrl = await getSignedUrlPromise("GET", awsEndpoint, clientParams, 'transcribe', client)
-
-    // // res.status(200).json({
-    // //     "url": preSignedUrl,
-    // //     "key": Key
-    // // })
-
-    // // console.log(url);
-
+    return res.status(501).json({
+        status: 'false',
+        message: 'Streaming transcription not yet implemented',
+        note: 'Use /api/transcribe for batch transcription of video files'
+    });
 }

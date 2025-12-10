@@ -10,15 +10,17 @@ import PageLoader from '@/Components/Loader/pageloader';
 import HeaderBar from '@/Components/AppHeader/headerbar';
 import Timer from '@/Components/Timer/timer';
 import VideoPlayer from '@/Components/VideoPlayer/player';
+import { startTranscription, pollTranscriptionStatus, fetchAndExtractTranscript, saveTranscriptToDatabase, getTranscriptionErrorMessage } from '@/utils/transcription';
+import { TRANSCRIPTION_CONFIG } from '@/config/transcription';
 
 export default function RecordAssignments() {
     const router = useRouter();
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        // The user is not authenticated, handle it here.
-          router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            // The user is not authenticated, handle it here.
+            router.push('/login');
+        },
     });
 
     const params = useParams()
@@ -41,16 +43,16 @@ export default function RecordAssignments() {
     const [transcriptedResult, setTranscriptedResult] = useState('');
 
     const [questions, setQuestions] = useState([
-        {number: '1', question: 'Which one is more essential: Being a good listener or a good communicator?'},
-        {number: '2', question: 'Can you rate the importance of these aspects for you: Career development, perks and benefits, salary, or excellent work?'},
-        {number: '3', question: 'If your life were a book, what would it be called?'},
-        {number: '4', question: 'Which resonates with you: "Everything has to be perfect" or "Done is better than perfect"'},
-        {number: '5', question: 'What is your first step when you have a new task with little or almost no direction?'},
-        {number: '6', question: 'You are trapped in a labyrinth. How would you proceed?<ul><li>Red: I would try to break through the maze</li><li>Green: I would try the same route again and again until I figure it out</li><li>Blue: I would draw a detailed map to find my way</li><li>Yellow: I would try to communicate with other people to get help</li></ul>'},
-        {number: '7', question: 'How do you define success in your work?'},
-        {number: '8', question: 'How do you define work-life balance and how do you achieve it?'},
-        {number: '9', question: 'If you could wake up tomorrow and have a new skill or quality, what would it be and how would you use it in your role?'},
-        {number: '10', question: 'If you could be an object in an office, what would you be and why?'},
+        { number: '1', question: 'Which one is more essential: Being a good listener or a good communicator?' },
+        { number: '2', question: 'Can you rate the importance of these aspects for you: Career development, perks and benefits, salary, or excellent work?' },
+        { number: '3', question: 'If your life were a book, what would it be called?' },
+        { number: '4', question: 'Which resonates with you: "Everything has to be perfect" or "Done is better than perfect"' },
+        { number: '5', question: 'What is your first step when you have a new task with little or almost no direction?' },
+        { number: '6', question: 'You are trapped in a labyrinth. How would you proceed?<ul><li>Red: I would try to break through the maze</li><li>Green: I would try the same route again and again until I figure it out</li><li>Blue: I would draw a detailed map to find my way</li><li>Yellow: I would try to communicate with other people to get help</li></ul>' },
+        { number: '7', question: 'How do you define success in your work?' },
+        { number: '8', question: 'How do you define work-life balance and how do you achieve it?' },
+        { number: '9', question: 'If you could wake up tomorrow and have a new skill or quality, what would it be and how would you use it in your role?' },
+        { number: '10', question: 'If you could be an object in an office, what would you be and why?' },
     ])
     const [showItems, setShowItems] = useState(1);
 
@@ -58,9 +60,8 @@ export default function RecordAssignments() {
         try {
             const job_id = params.jobId;
             const response = await axios.get(`/reson-api/question/job/${job_id}`);
-            // console.log(response.data)
             setJobData(response.data);
-            
+
         } catch (error) {
             console.error('Error fetching job details: ', error.message);
         }
@@ -69,7 +70,7 @@ export default function RecordAssignments() {
     // Camera Permission
     const getCameraPermission = async () => {
         // Should I keep the recorded video null?
-        if(recordedVideo) {
+        if (recordedVideo) {
             setRecordedVideo(null)
         }
         if ("MediaRecorder" in window) {
@@ -122,7 +123,7 @@ export default function RecordAssignments() {
     const startRecording = async () => {
         setRecordingStatus("recording");
 
-        if(stream) {
+        if (stream) {
             const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a') ? 'video/mp4;codecs=avc1,mp4a' : 'video/webm;codecs=vp8,opus';
             const media = new MediaRecorder(stream, { mimeType });
             mediaRecorder.current = media;
@@ -153,19 +154,12 @@ export default function RecordAssignments() {
                     type: "video/mp4",
                 });
 
-                // console.log("file: ", file);
                 setVideoFile(file);
-
                 setRecordedVideo(videoUrl);
-                // console.log("videoUrl: ", videoUrl);
-                // uploadFile(videoBlob);
-                // console.log({ loading, downloadURL, uploading, progress, coconutJobId });
-
                 setVideoChunks([]);
             };
             mediaRecorder.current.stop();
             stream.getTracks().forEach((track) => track.stop());
-            // console.log('tracks', stream.getTracks())
         }
     };
 
@@ -175,8 +169,6 @@ export default function RecordAssignments() {
         setUserActions(false);
         // Stop all active Media tracks - so no more active camera and mic
         stream.getTracks().forEach((track) => track.stop());
-        // console.log('Get the company data');
-        // console.log('video: ', recordedVideo);
         let s3VideoUrl, s3VideoKey, s3VideoURI
         const companyData = axios.get(`/reson-api/company/${session.user.company_id}`);
         const data = (await companyData).data;
@@ -185,7 +177,7 @@ export default function RecordAssignments() {
         const qTitle = document.getElementById('recordQuestion')
         const questionTitle = qTitle.dataset.question
 
-        if(jobData.some(job => job['question_title'] === questionTitle)) {
+        if (jobData.some(job => job['question_title'] === questionTitle)) {
             const questionRecordLine = jobData.filter(job => job['question_title'] === questionTitle);
             const qKey = questionRecordLine[0].question_key;
             const qKeyJsonFile = qKey + '.json';
@@ -195,30 +187,39 @@ export default function RecordAssignments() {
             )
             const output = await resp.json();
             toast.info(output.status);
-            
+
             // Delete old video's transcripted json file from s3 bucket
             const deleteTranscription = await fetch(`/api/delete?file=${qKeyJsonFile}&fileType="json"&folder=${userFolder}`)
             const dtOutput = await deleteTranscription.json();
             toast.info(dtOutput.status);
 
             // Delete old video's transcription job
-            const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${qKey}`);
-            const dtjOutput = await deleteTranscriptionJob.json();
-            toast.info(dtjOutput.message);
+            try {
+                const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${qKey}`);
+                const dtjOutput = await deleteTranscriptionJob.json();
+
+                if (dtjOutput.status === 'false') {
+                    console.warn('Failed to delete transcription job:', dtjOutput);
+                    // Don't block the flow, just log warning
+                    // Job might not exist, which is fine
+                } else {
+                    console.log('Transcription job deleted successfully');
+                    // Optionally show toast: toast.info('Old transcription job deleted');
+                }
+            } catch (error) {
+                console.error('Error deleting transcription job:', error);
+                // Don't block the flow - deletion is not critical
+            }
         }
-        if(session.user.company_id) {
+        if (session.user.company_id) {
             // Upload the files to S3 bucket
             const file = videoFile;
             const filename = file.name;
-
-            // console.log(file)
-            // console.log(filename)
 
             const res = await fetch(
                 `/api/upload?file=${filename}&fileType=${fileType}&folder=${userFolder}`
             )
             const { url, key } = await res.json()
-            // console.log(url)
 
             const upload = await fetch(url, {
                 method: 'PUT',
@@ -227,7 +228,7 @@ export default function RecordAssignments() {
             })
             if (upload.ok) {
                 toast.success('Video uploaded successfully')
-                toast.info('Sending video for transcription', {delay: 500});
+                toast.info('Sending video for transcription', { delay: 500 });
             } else {
                 setUserActions(true);
                 toast.error('Video upload failed. Please try again later')
@@ -238,10 +239,67 @@ export default function RecordAssignments() {
             s3VideoKey = key
         }
 
-        const transcription = await fetch(
-            `/api/transcribe?media=${s3VideoUrl}&outputBucket=${userFolder}&jobName=${s3VideoKey}`
-        )
-        const transcriptionResponse = await transcription.json()
+        // Start transcription with error handling
+        try {
+            toast.info('Starting transcription...');
+            const transcriptionResponse = await startTranscription(s3VideoUrl, userFolder, s3VideoKey);
+
+            if (transcriptionResponse.status === 'true') {
+                toast.success('Transcription started successfully');
+                // Start polling for status and auto-save transcript when complete
+                const questionTitle = document.getElementById('recordQuestion')?.dataset?.question;
+                const questionRecordLine = jobData.filter(job => job['question_title'] === questionTitle);
+                const questionId = questionRecordLine.length > 0 ? questionRecordLine[0].question_id : null;
+
+                // Extract actual AWS job name from response (critical for status polling)
+                const actualJobName = transcriptionResponse.actualJobName || s3VideoKey;
+
+                // Start polling in background using the actual AWS job name
+                pollTranscriptionStatus(
+                    actualJobName,
+                    (status, retryCount) => {
+                        if (retryCount === 0) {
+                            toast.info('Transcription in progress. Please wait...');
+                        } else if (retryCount % TRANSCRIPTION_CONFIG.STATUS_UPDATE_INTERVAL === 0) {
+                            toast.info('Transcription still processing. Please wait...');
+                        }
+                    },
+                    async (completedJob) => {
+                        setTranscriptedResult(completedJob);
+                        toast.success('Transcription completed successfully');
+
+                        // Automatically fetch and save transcript to database
+                        if (questionId) {
+                            try {
+                                const transcriptText = await fetchAndExtractTranscript(s3VideoKey, userFolder);
+                                if (transcriptText) {
+                                    const saved = await saveTranscriptToDatabase(transcriptText, 'question', questionId);
+                                    if (saved) {
+                                        console.log('Transcript automatically saved to database');
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error auto-saving transcript:', error);
+                                // Don't show error to user, it's background operation
+                            }
+                        }
+                    },
+                    (error) => {
+                        const errorMessage = getTranscriptionErrorMessage(error);
+                        toast.error(errorMessage);
+                    }
+                );
+            } else {
+                console.warn('Unexpected transcription response:', transcriptionResponse);
+                toast.warn('Unexpected response from transcription service');
+            }
+        } catch (transcriptionError) {
+            console.error('Error starting transcription:', transcriptionError);
+            const errorMessage = getTranscriptionErrorMessage(transcriptionError);
+            toast.error(errorMessage);
+            setUserActions(true);
+            return false;
+        }
 
         try {
             var raw = {
@@ -257,7 +315,7 @@ export default function RecordAssignments() {
 
             let response;
 
-            if(jobData.some(job => job['question_title'] === questionTitle)) {
+            if (jobData.some(job => job['question_title'] === questionTitle)) {
                 console.log('yes')
                 const questionRecordLine = jobData.filter(job => job['question_title'] === questionTitle);
                 const qID = questionRecordLine[0].question_id;
@@ -265,23 +323,21 @@ export default function RecordAssignments() {
             } else {
                 response = await axios.post('/reson-api/question/', raw);
             }
-            if(response.status === 201 || response.status === 200) {
+            if (response.status === 201 || response.status === 200) {
                 toast.success('Question saved successfully');
                 setUserActions(true);
-                // console.log('show next question')
                 let num = showItems;
-                if(num <=10) {
+                if (num <= 10) {
                     num = num + 1;
                     setShowItems(num)
-                }  
-                if(num > 10) {
+                }
+                if (num > 10) {
                     // getCameraPermission()
                     stream.getTracks().forEach((track) => track.stop());
                     router.push('/company/thank-you-assignments')
                 } else {
                     getCameraPermission()
                 }
-                console.log(showItems)
             } else {
                 setUserActions(true);
                 getCameraPermission()
@@ -291,25 +347,27 @@ export default function RecordAssignments() {
         }
     }
 
-    const transcriptionData = async (key) => await fetch(`/api/transcribe/status?jobName=${key}`)
-            .then((resp) => resp.json())
-            .then((result) => {
-                // console.log('result', result)
-                // result = JSON.parse(result)
-                const status = result.response.TranscriptionJob.TranscriptionJobStatus
-                console.log('status', status)
-                if(status === 'IN_PROGRESS' || status === 'QUEUED') {
-                    setTimeout(() => {
-                        console.log('still in progress');
-                        toast.info('We are still processing the transcription. Please wait for few moments');
-                        transcriptionData(key)
-                    }, 5000);
-                } else {
-                    console.log('result from func', result.response.TranscriptionJob)
-                    setTranscriptedResult(result.response.TranscriptionJob)
-                    return transcriptedResult
+    // Legacy function kept for backward compatibility, but now uses utility
+    const transcriptionData = async (key) => {
+        return pollTranscriptionStatus(
+            key,
+            (status, retryCount) => {
+                if (retryCount === 0) {
+                    toast.info('Transcription in progress. Please wait...');
+                } else if (retryCount % TRANSCRIPTION_CONFIG.STATUS_UPDATE_INTERVAL === 0) {
+                    toast.info('Transcription still processing. Please wait...');
                 }
-    });
+            },
+            (completedJob) => {
+                setTranscriptedResult(completedJob);
+                toast.success('Transcription completed successfully');
+            },
+            (error) => {
+                const errorMessage = getTranscriptionErrorMessage(error);
+                toast.error(errorMessage);
+            }
+        );
+    };
 
     const videoJsOptions = {
         autoplay: false,
@@ -323,111 +381,111 @@ export default function RecordAssignments() {
     };
 
     useEffect(() => {
-        if(session){
-            if(params.jobId) {
+        if (session) {
+            if (params.jobId) {
                 fetchJobQuestions();
             } else {
                 router.push('/company/post-job-vacancy')
             }
         }
-    }, [session]) 
+    }, [session])
 
     if (status === "loading") {
-        return <PageLoader/>
+        return <PageLoader />
     }
 
-    if(session.user.user_id === null || session.user.user_id === '') {
-    router.push('/register');
+    if (session.user.user_id === null || session.user.user_id === '') {
+        router.push('/register');
     }
-      
 
-    return(
+
+    return (
         <>
-        {/* Header bar */}
-        <HeaderBar />
-        <div className='container'>
-            <div className='row'>
-                <div className='col-12 top-content-box'>
-                    <h1 className='text-center mt-5 mb-3 body-heading'>{headline}</h1>
-                    {/* <p className='sub-text text-center mt-2 mb-2'>
+            {/* Header bar */}
+            <HeaderBar />
+            <div className='container'>
+                <div className='row'>
+                    <div className='col-12 top-content-box'>
+                        <h1 className='text-center mt-5 mb-3 body-heading'>{headline}</h1>
+                        {/* <p className='sub-text text-center mt-2 mb-2'>
                     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
                     </p> */}
+                    </div>
                 </div>
             </div>
-        </div>
-        <div className='container'>
-            <div className='row mt-3 mb-5'>
-                <div className='col-12 col-sm-2'></div>
-                <div className='col-12 col-sm-8 text-center position-relative'>
-                    {questions && questions.slice(showItems - 1, showItems).map((item, index) => (
-                        <div key={item.number} id='recordQuestion' className='question' data-question={`question-${item.number}`}><span className='questionNumber'>{item.number}</span> <span dangerouslySetInnerHTML={{ __html: item.question }} /></div>
-                    ))}
-                    <div className='mt-4 videoPlayer position-relative'>
-                        {countdown > 0 ? 
-                            <div className='videoCountdown'>
-                                <Timer time={3} />
-                            </div>
-                            : ""
-                        }
-                        {!recordedVideo ? (
-                            <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
-                        ) : null}
-
-                        {recordedVideo ? (
-                            <div className="recorded-player">
-                                {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
-                                <VideoPlayer {...videoJsOptions} />
-                            </div>
-                        ) : null}
-                    </div>
-                    <div className='videoControls position-absolute'>
-                        {!permission && !permissionClicked ? (
-                            <>
-                            <div className='enablePermission'>
-                                <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
-                                <p>Cam & Mic are not active</p>
-                            </div>
-                            <div className='requestPermission' onClick={getCameraPermission}>
-                                Start Camera
-                            </div>
-                            </>
-                        ) : null}
-                        {permission && recordingStatus === "inactive" ? (
-                            <div className='recordBtn' onClick={handleStartRecording}>
-                                <div className='recordVideo'></div>
-                            </div>
-                        ) : null}
-                        {recordingStatus === "recording" ? (
-                            <div className='recordBtn active' onClick={stopRecording}>
-                                <div className='recordVideo'></div>
-                            </div>
-                        ) : null}
-                        {recordedVideo ? (
-                            <>
-                                <div id='userActionVideos'>
-                                    {userActions ? (
-                                    <>
-                                    <p className='looksGood'>Looks Good?</p>
-                                    <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
-                                        Yes
-                                    </div>
-                                    <div className='discardBtn roundBtn' onClick={getCameraPermission}>
-                                        No
-                                    </div>
-                                    </>
-                                    ) : (
-                                        <>
-                                        <p className='waiting looksGood'>Please wait...</p>
-                                        </>
-                                    )}
+            <div className='container'>
+                <div className='row mt-3 mb-5'>
+                    <div className='col-12 col-sm-2'></div>
+                    <div className='col-12 col-sm-8 text-center position-relative'>
+                        {questions && questions.slice(showItems - 1, showItems).map((item, index) => (
+                            <div key={item.number} id='recordQuestion' className='question' data-question={`question-${item.number}`}><span className='questionNumber'>{item.number}</span> <span dangerouslySetInnerHTML={{ __html: item.question }} /></div>
+                        ))}
+                        <div className='mt-4 videoPlayer position-relative'>
+                            {countdown > 0 ?
+                                <div className='videoCountdown'>
+                                    <Timer time={3} />
                                 </div>
-                            </>
-                        ) : null}
+                                : ""
+                            }
+                            {!recordedVideo ? (
+                                <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
+                            ) : null}
+
+                            {recordedVideo ? (
+                                <div className="recorded-player">
+                                    {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
+                                    <VideoPlayer {...videoJsOptions} />
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className='videoControls position-absolute'>
+                            {!permission && !permissionClicked ? (
+                                <>
+                                    <div className='enablePermission'>
+                                        <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
+                                        <p>Cam & Mic are not active</p>
+                                    </div>
+                                    <div className='requestPermission' onClick={getCameraPermission}>
+                                        Start Camera
+                                    </div>
+                                </>
+                            ) : null}
+                            {permission && recordingStatus === "inactive" ? (
+                                <div className='recordBtn' onClick={handleStartRecording}>
+                                    <div className='recordVideo'></div>
+                                </div>
+                            ) : null}
+                            {recordingStatus === "recording" ? (
+                                <div className='recordBtn active' onClick={stopRecording}>
+                                    <div className='recordVideo'></div>
+                                </div>
+                            ) : null}
+                            {recordedVideo ? (
+                                <>
+                                    <div id='userActionVideos'>
+                                        {userActions ? (
+                                            <>
+                                                <p className='looksGood'>Looks Good?</p>
+                                                <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
+                                                    Yes
+                                                </div>
+                                                <div className='discardBtn roundBtn' onClick={getCameraPermission}>
+                                                    No
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className='waiting looksGood'>Please wait...</p>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            ) : null}
+                        </div>
                     </div>
+                    <div className='col-12 col-sm-2'></div>
                 </div>
-                <div className='col-12 col-sm-2'></div>
             </div>
-        </div>
         </>
     );
 }

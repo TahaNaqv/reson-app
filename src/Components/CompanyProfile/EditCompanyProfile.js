@@ -8,11 +8,11 @@ import Link from 'next/link';
 
 export default function EditCompanyProfile() {
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        // The user is not authenticated, handle it here.
-          router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            // The user is not authenticated, handle it here.
+            router.push('/login');
+        },
     });
 
     const [companyData, setCompanyData] = useState('');
@@ -39,7 +39,7 @@ export default function EditCompanyProfile() {
 
             setS3FileUrl(durl);
             // console.log(s3FileUrl);
-            
+
         } catch (error) {
             console.error('Error fetching company id: ', error.message);
         }
@@ -47,8 +47,8 @@ export default function EditCompanyProfile() {
 
 
     useEffect(() => {
-        if(session){
-            if(session.user.company_id != 0) {
+        if (session) {
+            if (session.user.company_id != 0) {
                 fetchCompanyData()
             } else {
                 router.push('/company/create-profile')
@@ -61,7 +61,7 @@ export default function EditCompanyProfile() {
         if (s3FileUrl && logoImgRef.current) {
             logoImgRef.current.src = s3FileUrl;
         }
-    }, [s3FileUrl]) 
+    }, [s3FileUrl])
 
     const handleEditSubmit = async (event) => {
         event.preventDefault();
@@ -72,8 +72,8 @@ export default function EditCompanyProfile() {
         const filename = file.name
         let userProfilePic = companyData.company_logo
         let s3key = companyData.company_logo_key
-        
-        if(filename) {
+
+        if (filename) {
             // Upload the files to S3 bucket
             const fileType = encodeURIComponent(file.type)
             const userFolder = 'user_id_' + formData.get('user_id') + '/company'
@@ -129,7 +129,7 @@ export default function EditCompanyProfile() {
             // console.log('raw', raw)
 
             const response = await axios.put(`/reson-api/company/${formData.get('company_id')}`, raw);
-            if(response.status === 200) {
+            if (response.status === 200) {
                 toast.success('Company profile updated successfully');
                 document.getElementById('submitEditCompanyProfile').value = 'Update and save'
             }
@@ -150,9 +150,9 @@ export default function EditCompanyProfile() {
             console.log('previewImg', previewImg)
         }
     }
-      
 
-    return(
+
+    return (
         <>
             {companyData && (
                 <form className='container' id='editCompanyProfile' onSubmit={handleEditSubmit}>
@@ -166,16 +166,16 @@ export default function EditCompanyProfile() {
                         </div>
                         <div className='col-12 col-sm-4 ps-5 position-relative'>
                             <label htmlFor='company_logo'>Company Logo
-                            <span className='uploadImgBtn position-relative'>Upload new logo</span>
+                                <span className='uploadImgBtn position-relative'>Upload new logo</span>
                             </label>
                             <input type='file' id='company_logo' className='hidden' name='company_logo' accept=".jpg, .jpeg, .png" onChange={handlePreview} />
                             {s3FileUrl && (
-                                <img 
+                                <img
                                     ref={logoImgRef}
-                                    width={50} 
-                                    height={50} 
-                                    alt="Company Logo" 
-                                    className={`editCompanyLogo ${isActive ? "hidden" : ""}`} 
+                                    width={50}
+                                    height={50}
+                                    alt="Company Logo"
+                                    className={`editCompanyLogo ${isActive ? "hidden" : ""}`}
                                     id='s3CompanyLogo'
                                     onError={(e) => {
                                         console.error('Image failed to load. URL:', s3FileUrl);

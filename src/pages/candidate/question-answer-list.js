@@ -9,6 +9,8 @@ import { SendMailClient } from 'zeptomail';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import CandidateHeader from '@/Components/CandidateHeader/candidateHeader';
 import VideoPlayer from '@/Components/VideoPlayer/player';
+import { startTranscription, pollTranscriptionStatus, fetchAndExtractTranscript, saveTranscriptToDatabase, getTranscriptionErrorMessage } from '@/utils/transcription';
+import { TRANSCRIPTION_CONFIG } from '@/config/transcription';
 
 export default function Welcome() {
     const router = useRouter();
@@ -26,14 +28,12 @@ export default function Welcome() {
             setJobId(JSON.parse(storedJobDetails));
         }
     }, []);
-    // console.log(jobId, 'jobid');
     useEffect(() => {
         const storedCandidateDetails = localStorage.getItem('candidateDetails');
         if (storedCandidateDetails) {
             setCandidateDetails(JSON.parse(storedCandidateDetails));
         }
     }, []);
-    // console.log(candidateDetails, 'candidate dets')
 
     const [jobDetails, setJobDetails] = useState('');
     useEffect(() => {
@@ -76,17 +76,15 @@ export default function Welcome() {
         }
 
         // Get Answer data
-        if(candidateDetails && jobId) {
-            // console.log(candidateDetails)
-            // console.log((`/reson-api/answer/candidate/${candidateDetails.candidateId}/job/${jobId.job_id}`))
+        if (candidateDetails && jobId) {
             axios.get(`/reson-api/answer/candidate/${candidateDetails.candidateId}/job/${jobId.job_id}`)
-            .then(response => {
-                console.log(response.data)
-                setAnswerDetails(response.data)
-            })
-            .catch(error => {
-                console.error('Error fetching answers: ', error)
-            })
+                .then(response => {
+                    console.log(response.data)
+                    setAnswerDetails(response.data)
+                })
+                .catch(error => {
+                    console.error('Error fetching answers: ', error)
+                })
         }
 
     }, [jobId]);
@@ -95,7 +93,7 @@ export default function Welcome() {
     const [s3VideoText, setS3VideoText] = useState('');
 
     const welcomeVideo = async () => {
-        if(companyDetails) {
+        if (companyDetails) {
             console.log(questionDetails[currentQuestionIndex].question_id, 'get question id');
             try {
                 const userFolder = 'user_id_' + companyDetails.user_id + '/company/job_id_' + jobDetails.job_id;
@@ -103,7 +101,6 @@ export default function Welcome() {
 
                 const s3key = (await response).data.question_key;
                 const s3JsonKey = s3key + '.json';
-                // console.log(s3key)
                 const s3folder = userFolder;
 
                 const res2 = await fetch(
@@ -125,7 +122,6 @@ export default function Welcome() {
                 })
 
                 setS3VideoText(fetchS3JSON.url);
-                // console.log(s3VideoText)
 
             } catch (error) {
                 console.error('Error fetching welcome', error.message)
@@ -146,8 +142,6 @@ export default function Welcome() {
             welcomeVideo();
             getCameraPermission();
         } else {
-            // Optionally, you can handle the case where there are no more questions
-            // console.log("No more questions");
             clearPermissions()
             setShowSubmit(true);
         }
@@ -243,7 +237,7 @@ export default function Welcome() {
         }
     };
 
-    const clearPermissions= async () => {
+    const clearPermissions = async () => {
         setPermission(false);
         setRecordingStatus("inactive");
         let videoTrack = stream.getVideoTracks()[0];
@@ -252,11 +246,11 @@ export default function Welcome() {
         stream.removeTrack(videoTrack);
         stream.removeTrack(audioTrack);
 
-        stream.getTracks().forEach(function(track) {
+        stream.getTracks().forEach(function (track) {
             console.log(track)
             stream.removeTrack(track)
             track.stop();
-          });
+        });
     }
 
     const stopRecording = () => {
@@ -274,17 +268,11 @@ export default function Welcome() {
 
                 // console.log("file: ", file);
                 setVideoFile(file);
-
                 setRecordedVideo(videoUrl);
-                // console.log("videoUrl: ", videoUrl);
-                // uploadFile(videoBlob);
-                // console.log({ loading, downloadURL, uploading, progress, coconutJobId });
-
                 setVideoChunks([]);
             };
             mediaRecorder.current.stop();
             stream.getTracks().forEach((track) => track.stop());
-            // console.log('tracks', stream.getTracks())
         }
     };
     const handleVideoUpload = async () => {
@@ -298,7 +286,7 @@ export default function Welcome() {
         const aTitle = document.getElementById('answerNumber')
         const answerTitle = aTitle.dataset.answer
 
-        if ( questionDetails[currentQuestionIndex], candidateDetails, jobId, answerDetails ) {
+        if (questionDetails[currentQuestionIndex], candidateDetails, jobId, answerDetails) {
             // Upload the files to S3 bucket
             const file = videoFile;
             const filename = file.name;
@@ -307,8 +295,8 @@ export default function Welcome() {
 
             console.log(answerTitle, 'at')
             console.log(answerDetails, 'answer details')
-console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
-            if(answerDetails.some(job => job['answer_title'] === answerTitle)) {
+            console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
+            if (answerDetails.some(job => job['answer_title'] === answerTitle)) {
                 const questionRecordLine = answerDetails.filter(job => job['answer_title'] === answerTitle);
                 console.log('questionRecordLine', questionRecordLine)
 
@@ -320,26 +308,35 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
                 )
                 const output = await resp.json();
                 toast.info(output.status);
-                
+
                 // Delete old video's transcripted json file from s3 bucket
                 const deleteTranscription = await fetch(`/api/delete?file=${qKeyJsonFile}&fileType="json"&folder=${userFolder}`)
                 const dtOutput = await deleteTranscription.json();
                 toast.info(dtOutput.status);
-    
-                // Delete old video's transcription job
-                const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${qKey}`);
-                const dtjOutput = await deleteTranscriptionJob.json();
-                toast.info(dtjOutput.message);
-            }
 
-            // console.log(file)
-            // console.log(filename)
+                // Delete old video's transcription job
+                try {
+                    const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${qKey}`);
+                    const dtjOutput = await deleteTranscriptionJob.json();
+
+                    if (dtjOutput.status === 'false') {
+                        console.warn('Failed to delete transcription job:', dtjOutput);
+                        // Don't block the flow, just log warning
+                        // Job might not exist, which is fine
+                    } else {
+                        console.log('Transcription job deleted successfully');
+                        // Optionally show toast: toast.info('Old transcription job deleted');
+                    }
+                } catch (error) {
+                    console.error('Error deleting transcription job:', error);
+                    // Don't block the flow - deletion is not critical
+                }
+            }
 
             const res = await fetch(
                 `/api/upload?file=${filename}&fileType=${fileType}&folder=${userFolder}`
             )
             const { url, key } = await res.json()
-            // console.log(url)
 
             const upload = await fetch(url, {
                 method: 'PUT',
@@ -348,7 +345,7 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
             })
             if (upload.ok) {
                 toast.success('Video uploaded successfully')
-                toast.info('Sending video for transcription', {delay: 500});
+                toast.info('Sending video for transcription', { delay: 500 });
             } else {
                 setUserActions(true);
                 toast.error('Video upload failed. Please try again later')
@@ -359,14 +356,67 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
             s3VideoKey = key
         }
 
-        // Send video for transcription
-        const transcription = await fetch(
-            `/api/transcribe?media=${s3VideoUrl}&outputBucket=${userFolder}&jobName=${s3VideoKey}`
-        )
-        console.log(`/api/transcribe?media=${s3VideoUrl}&outputBucket=${userFolder}&jobName=${s3VideoKey}`);
-        const transcriptionResponse = await transcription.json()
+        // Send video for transcription with error handling
+        try {
+            toast.info('Starting transcription...');
+            const transcriptionResponse = await startTranscription(s3VideoUrl, userFolder, s3VideoKey);
 
-        console.log('transcriptionResponse', transcriptionResponse)
+            if (transcriptionResponse.status === 'true') {
+                toast.success('Transcription started successfully');
+
+                // Start polling for status and auto-save transcript when complete
+                const answerTitle = document.getElementById('answerNumber')?.dataset?.answer;
+                const questionRecordLine = answerDetails.filter(job => job['answer_title'] === answerTitle);
+                const answerId = questionRecordLine.length > 0 ? questionRecordLine[0].answer_id : null;
+
+                // Extract actual AWS job name from response (critical for status polling)
+                const actualJobName = transcriptionResponse.actualJobName || s3VideoKey;
+
+                // Start polling in background using the actual AWS job name
+                pollTranscriptionStatus(
+                    actualJobName,
+                    (status, retryCount) => {
+                        if (retryCount === 0) {
+                            toast.info('Transcription in progress. Please wait...');
+                        } else if (retryCount % TRANSCRIPTION_CONFIG.STATUS_UPDATE_INTERVAL === 0) {
+                            toast.info('Transcription still processing. Please wait...');
+                        }
+                    },
+                    async (completedJob) => {
+                        toast.success('Transcription completed successfully');
+
+                        // Automatically fetch and save transcript to database
+                        if (answerId) {
+                            try {
+                                const transcriptText = await fetchAndExtractTranscript(s3VideoKey, userFolder);
+                                if (transcriptText) {
+                                    const saved = await saveTranscriptToDatabase(transcriptText, 'answer', answerId);
+                                    if (saved) {
+                                        console.log('Transcript automatically saved to database');
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error auto-saving transcript:', error);
+                                // Don't show error to user, it's background operation
+                            }
+                        }
+                    },
+                    (error) => {
+                        const errorMessage = getTranscriptionErrorMessage(error);
+                        toast.error(errorMessage);
+                    }
+                );
+            } else {
+                console.warn('Unexpected transcription response:', transcriptionResponse);
+                toast.warn('Unexpected response from transcription service');
+            }
+        } catch (transcriptionError) {
+            console.error('Error starting transcription:', transcriptionError);
+            const errorMessage = getTranscriptionErrorMessage(transcriptionError);
+            toast.error(errorMessage);
+            setUserActions(true);
+            return false;
+        }
 
         if (questionDetails[currentQuestionIndex], candidateDetails) {
             try {
@@ -385,7 +435,7 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
 
                 let response;
 
-                if(answerDetails.some(job => job['answer_title'] === answerTitle)) {
+                if (answerDetails.some(job => job['answer_title'] === answerTitle)) {
                     console.log('yes')
                     const questionRecordLine = answerDetails.filter(job => job['answer_title'] === answerTitle);
                     const qID = questionRecordLine[0].answer_id;
@@ -434,28 +484,28 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
                 const candidateEmail = JSON.parse(localStorage.getItem('candidateDetails')).candidateEmail
                 const candidateName = JSON.parse(localStorage.getItem('candidateDetails')).firstName + ' ' + JSON.parse(localStorage.getItem('candidateDetails')).lastName
 
-                let client = new SendMailClient({url, token});
+                let client = new SendMailClient({ url, token });
 
                 client.sendMail({
                     "mail_template_key": process.env.ZEPTO_TEMPLATE_KEY,
-                    "from": 
+                    "from":
                     {
                         "address": "noreply@uarl.in",
                         "name": "Reson"
                     },
-                    "to": 
-                    [
-                        {
-                        "email_address": 
+                    "to":
+                        [
                             {
-                                "address": candidateEmail,
-                                "name": candidateName
+                                "email_address":
+                                {
+                                    "address": candidateEmail,
+                                    "name": candidateName
+                                }
                             }
-                        }
-                    ],
-                    "merge_info": {"name":candidateName},
+                        ],
+                    "merge_info": { "name": candidateName },
                     "subject": "Thank you for submitting your answers, we will email you a result link once ready"
-                }).then((resp) => console.log("success - mail sent")).catch((error) => console.log(error,"error"));
+                }).then((resp) => console.log("success - mail sent")).catch((error) => console.log(error, "error"));
                 toast.success('Job result submitted successfully');
                 router.push('/candidate/thankyou');
             }
@@ -502,99 +552,99 @@ console.log(answerDetails.some(job => job['answer_title'] === answerTitle))
                     </div>
                 </div>
                 {!showSubmit ? (
-                <>
-                <div className='row'>
-                    <div className='col-12'>
-                        <div className='spacer-40 mt-4 mb-4'></div>
-                    </div>
-                </div>
-                {currentQuestionIndex < questionDetails.length && (
-                    <div className='d-flex'>
-                        <div className='col-12 col-sm-6'>
-                            <div className='videoPlayer position-relative'>
-                                <div className="recorded-player">
-                                    <video className="recorded" src={recruiterS3VideoUrl} autoPlay controls></video>
-                                    {/* {recruiterS3VideoUrl && (
+                    <>
+                        <div className='row'>
+                            <div className='col-12'>
+                                <div className='spacer-40 mt-4 mb-4'></div>
+                            </div>
+                        </div>
+                        {currentQuestionIndex < questionDetails.length && (
+                            <div className='d-flex'>
+                                <div className='col-12 col-sm-6'>
+                                    <div className='videoPlayer position-relative'>
+                                        <div className="recorded-player">
+                                            <video className="recorded" src={recruiterS3VideoUrl} autoPlay controls></video>
+                                            {/* {recruiterS3VideoUrl && (
                                         <VideoPlayer {...videoJsOptions} />
                                     )} */}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className='col-12 col-sm-6 position-relative'>
+                                    <div className='videoPlayer position-relative'>
+                                        {countdown > 0 ?
+                                            <div className='videoCountdown'>
+                                                <Timer time={3} />
+                                            </div>
+                                            : ""
+                                        }
+                                        {!recordedVideo ? (
+                                            <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
+                                        ) : null}
+
+                                        {recordedVideo ? (
+                                            <div className="recorded-player">
+                                                {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
+                                                <VideoPlayer {...videoRecJsOptions} />
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <div className='videoControls position-absolute'>
+                                        {!permission && !permissionClicked ? (
+                                            <>
+                                                <div className='enablePermission'>
+                                                    <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
+                                                    <p>Cam & Mic are not active</p>
+                                                </div>
+                                                <div className='requestPermission' onClick={getCameraPermission}>
+                                                    Request Permission
+                                                </div>
+                                            </>
+                                        ) : null}
+                                        {permission && recordingStatus === "inactive" ? (
+                                            <div className='recordBtn' onClick={handleStartRecording}>
+                                                <div className='recordVideo'></div>
+                                            </div>
+                                        ) : null}
+                                        {recordingStatus === "recording" ? (
+                                            <div className='recordBtn active' onClick={stopRecording}>
+                                                <div className='recordVideo'></div>
+                                            </div>
+                                        ) : null}
+                                        {recordedVideo ? (
+                                            <>
+                                                <div id='userActionVideos'>
+                                                    {userActions ? (
+                                                        <>
+                                                            <p className='looksGood'>Looks Good?</p>
+                                                            <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
+                                                                Yes
+                                                            </div>
+                                                            <div className='discardBtn roundBtn' onClick={getCameraPermission}>
+                                                                No
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <p className='waiting looksGood'>Please wait...</p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : null}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className='col-12 col-sm-6 position-relative'>
-                            <div className='videoPlayer position-relative'>
-                                {countdown > 0 ?
-                                    <div className='videoCountdown'>
-                                        <Timer time={3} />
-                                    </div>
-                                    : ""
-                                }
-                                {!recordedVideo ? (
-                                    <video ref={liveVideoFeed} autoPlay muted loop className="live-player"></video>
-                                ) : null}
-
-                                {recordedVideo ? (
-                                    <div className="recorded-player">
-                                        {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
-                                        <VideoPlayer {...videoRecJsOptions} />
-                                    </div>
-                                ) : null}
-                            </div>
-                            <div className='videoControls position-absolute'>
-                                {!permission && !permissionClicked ? (
-                                    <>
-                                        <div className='enablePermission'>
-                                            <Image src={'/images/no-camera.svg'} alt='camera and mic not active' width={48} height={34} />
-                                            <p>Cam & Mic are not active</p>
-                                        </div>
-                                        <div className='requestPermission' onClick={getCameraPermission}>
-                                            Request Permission
-                                        </div>
-                                    </>
-                                ) : null}
-                                {permission && recordingStatus === "inactive" ? (
-                                    <div className='recordBtn' onClick={handleStartRecording}>
-                                        <div className='recordVideo'></div>
-                                    </div>
-                                ) : null}
-                                {recordingStatus === "recording" ? (
-                                    <div className='recordBtn active' onClick={stopRecording}>
-                                        <div className='recordVideo'></div>
-                                    </div>
-                                ) : null}
-                                {recordedVideo ? (
-                                    <>
-                                        <div id='userActionVideos'>
-                                            {userActions ? (
-                                            <>
-                                            <p className='looksGood'>Looks Good?</p>
-                                            <div className='uploadBtn roundBtn' onClick={handleVideoUpload}>
-                                                Yes
-                                            </div>
-                                            <div className='discardBtn roundBtn' onClick={getCameraPermission}>
-                                                No
-                                            </div>
-                                            </>
-                                            ) : (
-                                                <>
-                                                <p className='waiting looksGood'>Please wait...</p>
-                                                </>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : null}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                </>
+                        )}
+                    </>
                 ) : (
-                <div className='row mt-5 text-center ps-5 mb-5'>
-                    <div className='col-sm-4'></div>
-                    <div className='col-12 col-sm-4 text-center ps-5 mb-5'>
-                        <div className='profile-btn cursor-pointer' onClick={handleSubmit}>Submit your profile</div>
+                    <div className='row mt-5 text-center ps-5 mb-5'>
+                        <div className='col-sm-4'></div>
+                        <div className='col-12 col-sm-4 text-center ps-5 mb-5'>
+                            <div className='profile-btn cursor-pointer' onClick={handleSubmit}>Submit your profile</div>
+                        </div>
+                        <div className='col-sm-4'></div>
                     </div>
-                    <div className='col-sm-4'></div>
-                </div>
                 )}
             </div>
         </>

@@ -12,14 +12,15 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import PageLoader from '@/Components/Loader/pageloader';
 import HeaderBar from '@/Components/AppHeader/headerbar';
 import VideoPlayer from '@/Components/VideoPlayer/player';
+import { fetchAndExtractTranscript, validateTranscriptFormat, extractTranscript } from '@/utils/transcription';
 
 export default function CandidateResult() {
     const router = useRouter();
     const { data: session, status } = useSession({
-      required: true,
-      onUnauthenticated() {
-        router.push('/login');
-      },
+        required: true,
+        onUnauthenticated() {
+            router.push('/login');
+        },
     });
 
     const params = useParams();
@@ -36,30 +37,64 @@ export default function CandidateResult() {
     const checkTranscriptionStatus = async () => {
         const jobId = params.jobId;
         const candidateId = params.cId.slice(10);
-        const fetchJobResult = await axios.get(`/reson-api/answer/candidate/${candidateId}/job/${jobId}`);
-        const jobResultData = await fetchJobResult.data;
-        if(jobResultData && jobResultData.length > 0) {
-            for (const row of jobResultData) {
-                const s3Key = row.answer_key;
-                const s3Folder = row.job_s3_folder;
-                const s3VideoUrl = `https://reson-assets.s3.eu-central-1.amazonaws.com/${s3Folder}/${s3Key}`
-                try {
-                    const transcriptionStatus = await axios.get(`/api/transcribe/status?jobName=${s3Key}`)
-                    const transcriptionExists = await transcriptionStatus.data;
-                    console.log(transcriptionExists)
-                    if(transcriptionExists.response.httpStatusCode === 400) {
 
-                        toast.info('No Transcription data available');
-                        const transcription = await fetch(
-                            `/api/transcribe?media=${s3VideoUrl}&outputBucket=${s3Folder}&jobName=${s3Key}`
-                        )
-                        const transcriptionResponse = await transcription.json()
+        try {
+            const fetchJobResult = await axios.get(`/reson-api/answer/candidate/${candidateId}/job/${jobId}`);
+            const jobResultData = await fetchJobResult.data;
+
+            if (jobResultData && jobResultData.length > 0) {
+                for (const row of jobResultData) {
+                    const s3Key = row.answer_key;
+                    const s3Folder = row.job_s3_folder;
+                    const s3VideoUrl = `https://reson-assets.s3.eu-central-1.amazonaws.com/${s3Folder}/${s3Key}`;
+
+                    try {
+                        const transcriptionStatus = await axios.get(`/api/transcribe/status?jobName=${s3Key}`);
+                        const transcriptionExists = transcriptionStatus.data;
+
+                        // Check if job doesn't exist (404) or failed
+                        if (transcriptionExists.status === 'false') {
+                            const httpStatus = transcriptionExists.response?.httpStatusCode;
+
+                            if (httpStatus === 404 || transcriptionExists.error === 'NotFoundException') {
+                                console.log('Transcription job not found, creating new job');
+                                toast.info('Starting transcription for missing job');
+
+                                const transcription = await fetch(
+                                    `/api/transcribe?media=${s3VideoUrl}&outputBucket=${s3Folder}&jobName=${s3Key}`
+                                );
+                                const transcriptionResponse = await transcription.json();
+
+                                if (transcriptionResponse.status === 'false') {
+                                    console.error('Failed to create transcription job:', transcriptionResponse);
+                                    toast.error('Failed to start transcription');
+                                } else {
+                                    toast.success('Transcription job created');
+                                }
+                            } else {
+                                console.error('Transcription status check failed:', transcriptionExists);
+                            }
+                        } else if (transcriptionExists.response?.TranscriptionJob) {
+                            const jobStatus = transcriptionExists.response.TranscriptionJob.TranscriptionJobStatus;
+
+                            if (jobStatus === 'FAILED') {
+                                const failureReason = transcriptionExists.response.TranscriptionJob.FailureReason;
+                                console.warn('Transcription job failed:', failureReason);
+                                // Optionally recreate the job
+                            } else if (jobStatus === 'COMPLETED') {
+                                console.log('Transcription completed for', s3Key);
+                            } else {
+                                console.log('Transcription status:', jobStatus);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error checking transcription status for', s3Key, ':', error);
+                        // Don't block the flow, just log the error
                     }
-                    // return
-                } catch (error) {
-                    
                 }
             }
+        } catch (error) {
+            console.error('Error in checkTranscriptionStatus:', error);
         }
     }
 
@@ -81,16 +116,35 @@ export default function CandidateResult() {
                     const getVideoLink = await getVideo.data
                     const videoLink = getVideoLink.durl;
 
-                    const getJson = await axios.get(`/api/download?file=${jsonS3Key}&key=${jsonS3Key}&folder=${s3folder}`);
-                    const getJsonLink = await getJson.data
+                    // Try to get transcript JSON - handle missing transcripts gracefully
+                    let answers = 'Transcript not available'; // Default fallback
 
-                    const jsonLink = getJsonLink.durl;
-                    const jsonText = await axios.get(jsonLink);
-                    const answers = jsonText.data.results.transcripts[0].transcript;
+                    try {
+                        // Use utility function to fetch and extract transcript
+                        const transcriptText = await fetchAndExtractTranscript(s3key, s3folder);
 
-                    arr.push({...item, answers, videoLink});
-                    systemArr.push({answerIndex: item.answer_title, answers})
-                    
+                        if (transcriptText) {
+                            answers = transcriptText;
+                        } else {
+                            // Fallback to database field if available
+                            if (item.answer_transcript && item.answer_transcript !== 'NA') {
+                                answers = item.answer_transcript;
+                            } else {
+                                answers = 'Transcript not available yet. Please try again later.';
+                            }
+                        }
+                    } catch (transcriptError) {
+                        console.error(`Error fetching transcript for ${jsonS3Key}:`, transcriptError.message);
+                        if (item.answer_transcript && item.answer_transcript !== 'NA') {
+                            answers = item.answer_transcript;
+                        } else {
+                            answers = 'Error loading transcript. Please try again later.';
+                        }
+                    }
+
+                    arr.push({ ...item, answers, videoLink });
+                    systemArr.push({ answerIndex: item.answer_title, answers })
+
                 }
             }
             // console.log('systemArr', systemArr)
@@ -113,12 +167,12 @@ export default function CandidateResult() {
             const getJobResult = await axios.get(`/reson-api/job_result/jobId/${jobId}/candidateId/${candidateId}`)
             const jobResultData = await getJobResult.data[0]
             console.log(`/reson-api/job_result/jobId/${jobId}/candidateId/${candidateId}`)
-            
 
-            if(jobResultData) {
+
+            if (jobResultData) {
                 console.log(jobResultData)
                 let resultJson
-                if(jobResultData.ai_output === 'NA') {
+                if (jobResultData.ai_output === 'NA') {
                     toast.info('Please wait, we are running openAI prompt on the results')
                     console.log('Run openAI prompt and store results in the db');
                     // fetch openAI results
@@ -136,13 +190,13 @@ export default function CandidateResult() {
 
                     // return
 
-                    if(getResults.data) {
+                    if (getResults.data) {
                         toast.success('Successfully fetched openAI results')
                         console.log('save results in db');
                         console.log(getJobResult.data, 'job data');
                         const interactionId = jobResultData.interaction_id;
                         const status = jobResultData.status;
-                        if( interactionId ) {
+                        if (interactionId) {
                             toast.info('Please wait, Saving Open AI results to db')
                             const jobRaw = {
                                 "status": status,
@@ -150,16 +204,16 @@ export default function CandidateResult() {
                             }
                             console.log(jobRaw);
                             const saveAIResult = await axios.put(`/reson-api/job_result/${interactionId}`, jobRaw)
-                            if(saveAIResult.status === 200 || saveAIResult.status === 201) {
+                            if (saveAIResult.status === 200 || saveAIResult.status === 201) {
                                 toast.success('AI results saved to db successfully');
                                 const reFetchJobResults = await axios.get(`/reson-api/job_result/jobId/${jobId}/candidateId/${candidateId}`);
                                 const getAIData = await reFetchJobResults.data
                                 console.log('getAIData', getAIData);
-                                if( getAIData ) {
+                                if (getAIData) {
                                     resultJson = JSON.parse(getAIData[0].ai_output)
                                     console.log('resultJson after ai', resultJson)
                                     setOpenAIResult(resultJson)
-                                    
+
                                 }
                             }
                         }
@@ -172,7 +226,7 @@ export default function CandidateResult() {
             } else {
                 toast.error('Error fetching job Result');
             }
-            
+
 
 
 
@@ -187,8 +241,8 @@ export default function CandidateResult() {
     }
 
     useEffect(() => {
-        if(session){
-            if(session.user.company_id !== 0) {
+        if (session) {
+            if (session.user.company_id !== 0) {
                 // checkTranscriptionStatus();
                 fetchData();
             } else {
@@ -200,24 +254,24 @@ export default function CandidateResult() {
     let vennData;
 
     useEffect(() => {
-        if(openAIResult) {
+        if (openAIResult) {
             vennData = [
                 { key: ['A'], data: 100 },
                 { key: ['B'], data: 100 },
                 { key: ['A', 'B'], data: openAIResult.finalResult[1] }
-              ];
+            ];
         }
     }, [openAIResult])
 
     if (status === "loading") {
-        return <PageLoader/>;
+        return <PageLoader />;
     }
 
-    if(session.user.user_id === null || session.user.user_id === '') {
+    if (session.user.user_id === null || session.user.user_id === '') {
         router.push('/register');
     }
 
-    return(
+    return (
         <>
             <HeaderBar />
             <div className='container-fluid'>

@@ -29,7 +29,7 @@ export default function ViewJobListing(jobDetails) {
 
             setS3FileUrl(durl);
             // console.log(s3FileUrl);
-            
+
         } catch (error) {
             console.error('Error fetching company id: ', error.message);
         }
@@ -44,30 +44,30 @@ export default function ViewJobListing(jobDetails) {
         if (s3FileUrl && logoImgRef.current) {
             logoImgRef.current.src = s3FileUrl;
         }
-    }, [s3FileUrl]) 
-      
+    }, [s3FileUrl])
 
-    return(
+
+    return (
         <>
             {companyData && (
                 <div className='col-12'>
                     <div className=' d-flex justify-content-between align-items-center'>
                         {/* <div className=''></div> */}
-                        
+
                         <div className='col-sm-8'>
                             <div className='row'>
                                 <div className='col-sm-3 text-end'>
                                     {s3FileUrl && (
-                                    <img 
-                                        ref={logoImgRef}
-                                        width={120} 
-                                        height={100} 
-                                        alt="Company Logo" 
-                                        className='companyLogo'
-                                        onError={(e) => {
-                                            console.error('Image failed to load. URL:', s3FileUrl);
-                                        }}
-                                    />
+                                        <img
+                                            ref={logoImgRef}
+                                            width={120}
+                                            height={100}
+                                            alt="Company Logo"
+                                            className='companyLogo'
+                                            onError={(e) => {
+                                                console.error('Image failed to load. URL:', s3FileUrl);
+                                            }}
+                                        />
                                     )}
                                 </div>
                                 <div className='col-sm-9'>
