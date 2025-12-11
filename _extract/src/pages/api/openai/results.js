@@ -1,12 +1,12 @@
 import OpenAI from 'openai';
 
-export default async function handler(req,res) {
+export default async function handler(req, res) {
     const openai = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
     });
 
     const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-2024-11-20",
         messages: [
             {
                 role: "system",
@@ -31,7 +31,7 @@ export default async function handler(req,res) {
     const result = response.choices[0];
 
     const score = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-2024-11-20",
         messages: [
             {
                 role: "system",
