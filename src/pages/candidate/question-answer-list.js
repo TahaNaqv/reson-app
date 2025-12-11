@@ -332,20 +332,25 @@ export default function Welcome() {
 
                 // Delete old video's transcription job
                 try {
-                    const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${qKey}`);
-                    const dtjOutput = await deleteTranscriptionJob.json();
-
-                    if (dtjOutput.status === 'false') {
-                        console.warn('Failed to delete transcription job:', dtjOutput);
-                        // Don't block the flow, just log warning
-                        // Job might not exist, which is fine
+                    const deleteJobName = questionRecordLine[0].answer_job_name || qKey;
+                    if (typeof deleteJobName === 'string' && deleteJobName.toLowerCase().endsWith('.mp4')) {
+                        console.warn('Skipping transcription job delete because jobName looks like a filename:', deleteJobName);
+                        toast.info('Skipped deleting old transcription job (job name looked like a filename)');
                     } else {
-                        console.log('Transcription job deleted successfully');
-                        // Optionally show toast: toast.info('Old transcription job deleted');
+                        const deleteTranscriptionJob = await fetch(`/api/transcribe/delete?jobName=${deleteJobName}`);
+                        const dtjOutput = await deleteTranscriptionJob.json();
+
+                        if (dtjOutput.status === 'false') {
+                            console.warn('Failed to delete transcription job:', dtjOutput);
+                            toast.warn('Could not delete old transcription job');
+                        } else {
+                            console.log('Transcription job deleted successfully');
+                            toast.info('Old transcription job deleted');
+                        }
                     }
                 } catch (error) {
                     console.error('Error deleting transcription job:', error);
-                    // Don't block the flow - deletion is not critical
+                    toast.warn('Error deleting old transcription job');
                 }
             }
 
