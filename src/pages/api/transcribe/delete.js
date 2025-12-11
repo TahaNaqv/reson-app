@@ -23,6 +23,16 @@ export default async function handler(req, res) {
         });
     }
 
+    // Guard: callers sometimes pass the media filename (.mp4) instead of the actual Transcribe job name
+    if (typeof Key.jobName === 'string' && Key.jobName.toLowerCase().endsWith('.mp4')) {
+        return res.status(400).json({
+            status: 'false',
+            message: 'Invalid job name. Use the actual Transcribe job name (not the media filename).',
+            error: 'BadRequestException',
+            details: 'jobName looks like a media filename. Pass the Transcribe job name returned by startTranscription.'
+        });
+    }
+
     // Configure TranscribeClient with explicit credentials
     const client = new TranscribeClient({
         region: process.env.REGION,

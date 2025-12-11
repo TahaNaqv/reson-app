@@ -469,9 +469,49 @@ export async function saveTranscriptToDatabase(transcriptText, entityType, entit
         const fieldName = entityType === 'question' ? 'question_transcript' : 'answer_transcript';
         const endpoint = entityType === 'question' ? `/reson-api/question/${entityId}` : `/reson-api/answer/${entityId}`;
 
-        const response = await axios.put(endpoint, {
-            [fieldName]: trimmed
-        });
+        // Fetch existing record to include required fields expected by backend PUT routes
+        const existingResponse = await axios.get(endpoint);
+        if (existingResponse.status !== 200 || !existingResponse.data) {
+            console.warn(`Could not load existing ${entityType} ${entityId} for transcript save`);
+            return false;
+        }
+
+        const existing = existingResponse.data;
+
+        // Build payload including all required fields for PUT
+        let payload = {};
+        if (entityType === 'question') {
+            const { question_key, job_s3_folder, question_title, question_video_url } = existing;
+            if (!question_key || !job_s3_folder || !question_title || !question_video_url) {
+                console.error(`Missing required question fields for PUT on ${entityId}`, { question_key, job_s3_folder, question_title, question_video_url });
+                return false;
+            }
+            payload = {
+                question_key,
+                job_s3_folder,
+                question_title,
+                question_video_url,
+                [fieldName]: trimmed
+            };
+        } else {
+            const { candidate_id, job_id, question_id, answer_url, answer_title, answer_key, job_s3_folder } = existing;
+            if (!candidate_id || !answer_url || !answer_title || !answer_key || !job_s3_folder) {
+                console.error(`Missing required answer fields for PUT on ${entityId}`, { candidate_id, answer_url, answer_title, answer_key, job_s3_folder });
+                return false;
+            }
+            payload = {
+                candidate_id,
+                job_id,
+                question_id,
+                answer_url,
+                answer_title,
+                answer_key,
+                job_s3_folder,
+                [fieldName]: trimmed
+            };
+        }
+
+        const response = await axios.put(endpoint, payload);
 
         if (response.status === 200 || response.status === 201) {
             console.log(`Transcript saved successfully for ${entityType} ${entityId} (length: ${trimmed.length} characters)`);

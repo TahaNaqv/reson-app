@@ -358,7 +358,8 @@ export default function RecordWelcomeMessageCEO() {
                             {recordedVideo ? (
                                 <div className="recorded-player">
                                     {/* <video className="recorded" src={recordedVideo} autoPlay controls></video> */}
-                                    <VideoPlayer {...videoJsOptions} />
+                                    {/* Guard against double initialization by keying on the current video source */}
+                                    <VideoPlayer key={recordedVideo || 'welcome-player'} {...videoJsOptions} />
                                 </div>
                             ) : null}
                         </div>

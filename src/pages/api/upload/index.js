@@ -48,6 +48,13 @@ export default async function handler(req, res) {
             ContentType: req.query.fileType,
         };
 
+        console.log('Generating upload URL', {
+            bucket: process.env.BUCKET_NAME,
+            key: s3Params.Key,
+            expires: s3Params.Expires,
+            contentType: s3Params.ContentType
+        });
+
         const preSignedUrl = await s3.getSignedUrlPromise("putObject", s3Params)
 
         res.status(200).json({
